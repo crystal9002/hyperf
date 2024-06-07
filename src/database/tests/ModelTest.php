@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\Database;
 
 use Carbon\Carbon;
@@ -16,6 +17,8 @@ use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Exception;
+use Hyperf\Collection\Collection as BaseCollection;
+use Hyperf\Context\ApplicationContext;
 use Hyperf\Context\Context;
 use Hyperf\Database\ConnectionInterface;
 use Hyperf\Database\ConnectionInterface as Connection;
@@ -27,6 +30,8 @@ use Hyperf\Database\Model\Booted;
 use Hyperf\Database\Model\Builder;
 use Hyperf\Database\Model\Collection;
 use Hyperf\Database\Model\Events;
+use Hyperf\Database\Model\JsonEncodingException;
+use Hyperf\Database\Model\MassAssignmentException;
 use Hyperf\Database\Model\Model;
 use Hyperf\Database\Model\Register;
 use Hyperf\Database\Model\Relations\BelongsTo;
@@ -36,9 +41,8 @@ use Hyperf\Database\Query\Builder as BaseBuilder;
 use Hyperf\Database\Query\Grammars\Grammar;
 use Hyperf\Database\Query\Processors\Processor;
 use Hyperf\Engine\Channel;
-use Hyperf\Utils\ApplicationContext;
-use Hyperf\Utils\Collection as BaseCollection;
-use Hyperf\Utils\InteractsWithTime;
+use Hyperf\Stringable\Str;
+use Hyperf\Support\Traits\InteractsWithTime;
 use HyperfTest\Database\Stubs\DateModelStub;
 use HyperfTest\Database\Stubs\DifferentConnectionModelStub;
 use HyperfTest\Database\Stubs\KeyTypeModelStub;
@@ -57,22 +61,30 @@ use HyperfTest\Database\Stubs\ModelSaveStub;
 use HyperfTest\Database\Stubs\ModelSavingEventStub;
 use HyperfTest\Database\Stubs\ModelStub;
 use HyperfTest\Database\Stubs\ModelStubWithTrait;
+use HyperfTest\Database\Stubs\ModelStubWithUlid;
+use HyperfTest\Database\Stubs\ModelStubWithUuid;
 use HyperfTest\Database\Stubs\ModelWithoutRelationStub;
 use HyperfTest\Database\Stubs\ModelWithoutTableStub;
 use HyperfTest\Database\Stubs\ModelWithStub;
 use HyperfTest\Database\Stubs\NoConnectionModelStub;
 use HyperfTest\Database\Stubs\User;
+use LogicException;
 use Mockery;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface as Dispatcher;
 use ReflectionClass;
 use stdClass;
 
+use function Hyperf\Collection\collect;
+use function Hyperf\Coroutine\go;
+
 /**
  * @internal
  * @coversNothing
  */
+#[CoversNothing]
 class ModelTest extends TestCase
 {
     use InteractsWithTime;
@@ -852,7 +864,6 @@ class ModelTest extends TestCase
 
         $class = new ReflectionClass($model);
         $method = $class->getMethod('getArrayableRelations');
-        $method->setAccessible(true);
 
         $model->setRelation('foo', ['bar']);
         $model->setRelation('bam', ['boom']);
@@ -1042,7 +1053,7 @@ class ModelTest extends TestCase
 
     public function testGlobalGuarded()
     {
-        $this->expectException(\Hyperf\Database\Model\MassAssignmentException::class);
+        $this->expectException(MassAssignmentException::class);
         $this->expectExceptionMessage('name');
 
         $model = new ModelStub();
@@ -1346,8 +1357,8 @@ class ModelTest extends TestCase
         $this->assertFalse($clone->exists);
         $this->assertEquals('hyperf', $clone->first);
         $this->assertEquals('otwell', $clone->last);
-        $this->assertObjectNotHasAttribute('created_at', $clone);
-        $this->assertObjectNotHasAttribute('updated_at', $clone);
+        $this->assertNull($clone->created_at);
+        $this->assertNull($clone->updated_at);
         $this->assertEquals(['bar'], $clone->foo);
     }
 
@@ -1397,7 +1408,7 @@ class ModelTest extends TestCase
 
     public function testGetModelAttributeMethodThrowsExceptionIfNotRelation()
     {
-        $this->expectException(\LogicException::class);
+        $this->expectException(LogicException::class);
         $this->expectExceptionMessage('HyperfTest\Database\Stubs\ModelStub::incorrectRelationStub must return a relationship instance.');
         $model = new ModelStub();
         $model->incorrectRelationStub;
@@ -1748,7 +1759,7 @@ class ModelTest extends TestCase
 
     public function testModelAttributeCastingFailsOnUnencodableData()
     {
-        $this->expectException(\Hyperf\Database\Model\JsonEncodingException::class);
+        $this->expectException(JsonEncodingException::class);
         $this->expectExceptionMessage('Unable to encode attribute [objectAttribute] for model [HyperfTest\Database\Stubs\ModelCastingStub] to JSON: Malformed UTF-8 characters, possibly incorrectly encoded.');
 
         $model = new ModelCastingStub();
@@ -1960,7 +1971,7 @@ class ModelTest extends TestCase
         $this->getContainer();
 
         /** @var Collection $users */
-        $users = User::findMany([1, 2]);
+        $users = User::query()->findMany([1, 2]);
         $s1 = serialize($users);
         $meta = $users->compress();
         $s2 = serialize($meta);
@@ -1989,6 +2000,20 @@ class ModelTest extends TestCase
 
         $this->assertTrue(Constraint::isConstraint());
         $chan->pop();
+    }
+
+    public function testUlid()
+    {
+        $model = new ModelStubWithUlid();
+
+        $this->assertTrue(Str::isUlid($model->newUniqueId()));
+    }
+
+    public function testUuid()
+    {
+        $model = new ModelStubWithUuid();
+
+        $this->assertTrue(Str::isUuid($model->newUniqueId()));
     }
 
     protected function getContainer()

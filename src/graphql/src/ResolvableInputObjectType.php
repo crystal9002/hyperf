@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\GraphQL;
 
 use GraphQL\Type\Definition\InputObjectType;
@@ -18,6 +19,7 @@ use TheCodingMachine\GraphQLite\Mappers\RecursiveTypeMapperInterface;
 use TheCodingMachine\GraphQLite\Types\ArgumentResolver;
 use TheCodingMachine\GraphQLite\Types\ResolvableInputInterface;
 use TheCodingMachine\GraphQLite\Types\ResolvableInputObjectType as TheCodingMachineResolvableInputObjectType;
+
 use function get_class;
 
 /**

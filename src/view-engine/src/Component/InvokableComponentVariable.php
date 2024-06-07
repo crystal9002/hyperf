@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\ViewEngine\Component;
 
 use ArrayIterator;
@@ -17,9 +18,10 @@ use Hyperf\ViewEngine\Contract\DeferringDisplayableValue;
 use Hyperf\ViewEngine\Contract\Enumerable;
 use Hyperf\ViewEngine\Contract\Htmlable;
 use IteratorAggregate;
+use Stringable;
 use Traversable;
 
-class InvokableComponentVariable implements DeferringDisplayableValue, IteratorAggregate, \Stringable
+class InvokableComponentVariable implements DeferringDisplayableValue, IteratorAggregate, Stringable
 {
     /**
      * Create a new variable instance.

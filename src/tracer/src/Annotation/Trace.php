@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Tracer\Annotation;
 
 use Attribute;
@@ -17,7 +18,7 @@ use Hyperf\Di\Annotation\AbstractAnnotation;
 #[Attribute(Attribute::TARGET_CLASS | Attribute::TARGET_METHOD)]
 class Trace extends AbstractAnnotation
 {
-    public function __construct(public string $name = '', public array|string $tag = 'source')
+    public function __construct(public string $name = '', public string $tag = 'source')
     {
     }
 }

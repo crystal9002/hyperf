@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\GraphQL;
 
 use GraphQL\Type\Definition\NonNull;
@@ -37,7 +38,9 @@ use phpDocumentor\Reflection\Types\Self_;
 use phpDocumentor\Reflection\Types\String_;
 use Psr\Http\Message\UploadedFileInterface;
 use ReflectionClass;
+use ReflectionException;
 use ReflectionMethod;
+use ReflectionParameter;
 use TheCodingMachine\GraphQLite\Annotations\SourceField;
 use TheCodingMachine\GraphQLite\FieldNotFoundException;
 use TheCodingMachine\GraphQLite\FromSourceFieldsInterface;
@@ -59,8 +62,11 @@ use TheCodingMachine\GraphQLite\Types\DateTimeType;
 use TheCodingMachine\GraphQLite\Types\ID;
 use TheCodingMachine\GraphQLite\Types\TypeResolver;
 use TheCodingMachine\GraphQLite\Types\UnionType;
+
 use function array_merge;
 use function get_parent_class;
+use function iterator_to_array;
+use function ucfirst;
 
 /**
  * A class in charge if returning list of fields for queries / mutations / entities / input types.
@@ -131,8 +137,8 @@ class FieldsBuilder
 
     /**
      * @param object $controller
-     * @throws \ReflectionException
      * @return QueryField[]
+     * @throws ReflectionException
      */
     public function getQueries($controller): array
     {
@@ -141,8 +147,8 @@ class FieldsBuilder
 
     /**
      * @param object $controller
-     * @throws \ReflectionException
      * @return QueryField[]
+     * @throws ReflectionException
      */
     public function getMutations($controller): array
     {
@@ -157,7 +163,7 @@ class FieldsBuilder
     {
         $fieldAnnotations = $this->getFieldsByAnnotations($controller, Field::class, true);
 
-        $refClass = new \ReflectionClass($controller);
+        $refClass = new ReflectionClass($controller);
 
         /** @var SourceField[] $sourceFields */
         $sourceFields = $this->annotationReader->getSourceFields($refClass);
@@ -188,7 +194,7 @@ class FieldsBuilder
     {
         $fieldAnnotations = $this->getFieldsByAnnotations(null, Field::class, false, $className);
 
-        $refClass = new \ReflectionClass($className);
+        $refClass = new ReflectionClass($className);
 
         /** @var SourceField[] $sourceFields */
         $sourceFields = $this->annotationReader->getSourceFields($refClass);
@@ -223,16 +229,16 @@ class FieldsBuilder
     /**
      * @param object $controller
      * @param bool $injectSource whether to inject the source object or not as the first argument
-     * @throws CannotMapTypeExceptionInterface
-     * @throws \ReflectionException
      * @return QueryField[]
+     * @throws CannotMapTypeExceptionInterface
+     * @throws ReflectionException
      */
     private function getFieldsByAnnotations($controller, string $annotationName, bool $injectSource, ?string $sourceClassName = null): array
     {
         if ($sourceClassName !== null) {
-            $refClass = new \ReflectionClass($sourceClassName);
+            $refClass = new ReflectionClass($sourceClassName);
         } else {
-            $refClass = new \ReflectionClass($controller);
+            $refClass = new ReflectionClass($controller);
         }
 
         $queryList = [];
@@ -358,10 +364,10 @@ class FieldsBuilder
 
     /**
      * @param array<int, SourceFieldInterface> $sourceFields
+     * @return QueryField[]
      * @throws CannotMapTypeException
      * @throws CannotMapTypeExceptionInterface
-     * @throws \ReflectionException
-     * @return QueryField[]
+     * @throws ReflectionException
      */
     private function getQueryFieldsFromSourceFields(array $sourceFields, ReflectionClass $refClass): array
     {
@@ -380,7 +386,7 @@ class FieldsBuilder
             throw MissingAnnotationException::missingTypeExceptionToUseSourceField();
         }
 
-        $objectRefClass = new \ReflectionClass($objectClass);
+        $objectRefClass = new ReflectionClass($objectClass);
 
         $oldDeclaringClass = null;
         $context = null;
@@ -447,7 +453,7 @@ class FieldsBuilder
         if ($reflectionClass->hasMethod($propertyName)) {
             $methodName = $propertyName;
         } else {
-            $upperCasePropertyName = \ucfirst($propertyName);
+            $upperCasePropertyName = ucfirst($propertyName);
             if ($reflectionClass->hasMethod('get' . $upperCasePropertyName)) {
                 $methodName = 'get' . $upperCasePropertyName;
             } elseif ($reflectionClass->hasMethod('is' . $upperCasePropertyName)) {
@@ -483,9 +489,9 @@ class FieldsBuilder
     /**
      * Note: there is a bug in $refMethod->allowsNull that forces us to use $standardRefMethod->allowsNull instead.
      *
-     * @param \ReflectionParameter[] $refParameters
-     * @throws MissingTypeHintException
+     * @param ReflectionParameter[] $refParameters
      * @return array[] An array of ['type'=>Type, 'defaultValue'=>val]
+     * @throws MissingTypeHintException
      */
     private function mapParameters(array $refParameters, DocBlock $docBlock): array
     {
@@ -549,7 +555,7 @@ class FieldsBuilder
                 if (! $isNullable) {
                     $graphQlType = GraphQLType::nonNull($graphQlType);
                 }
-            } catch (TypeMappingException|CannotMapTypeExceptionInterface $e) {
+            } catch (CannotMapTypeExceptionInterface|TypeMappingException $e) {
                 // Is the type iterable? If yes, let's analyze the docblock
                 // TODO: it would be better not to go through an exception for this.
                 if ($type instanceof Object_) {
@@ -590,7 +596,7 @@ class FieldsBuilder
         foreach ($filteredDocBlockTypes as $singleDocBlockType) {
             try {
                 $unionTypes[] = $this->toGraphQlType($this->dropNullableType($singleDocBlockType), null, $mapToInputType);
-            } catch (TypeMappingException|CannotMapTypeExceptionInterface $e) {
+            } catch (CannotMapTypeExceptionInterface|TypeMappingException $e) {
                 // We have several types. It is ok not to be able to match one.
                 $lastException = $e;
             }
@@ -654,7 +660,7 @@ class FieldsBuilder
                 // TODO: add here a scan of the $type variable and do stuff if it is iterable.
                 // TODO: remove the iterator type if specified in the docblock (@return Iterator|User[])
                 // TODO: check there is at least one array (User[])
-            } catch (TypeMappingException|CannotMapTypeExceptionInterface $e) {
+            } catch (CannotMapTypeExceptionInterface|TypeMappingException $e) {
                 // We have several types. It is ok not to be able to match one.
                 $lastException = $e;
             }
@@ -681,8 +687,8 @@ class FieldsBuilder
      * Casts a Type to a GraphQL type.
      * Does not deal with nullable.
      *
+     * @return GraphQLType (GraphQLType&InputType)|(GraphQLType&OutputType)
      * @throws CannotMapTypeExceptionInterface
-     * @return GraphQLType (InputType&GraphQLType)|(OutputType&GraphQLType)
      */
     private function toGraphQlType(Type $type, ?GraphQLType $subType, bool $mapToInputType): GraphQLType
     {
@@ -715,7 +721,7 @@ class FieldsBuilder
                     if ($mapToInputType) {
                         return $this->typeMapper->mapClassToInputType($className);
                     }
-                        return $this->typeMapper->mapClassToInterfaceOrType($className, $subType);
+                    return $this->typeMapper->mapClassToInterfaceOrType($className, $subType);
             }
         } elseif ($type instanceof Array_) {
             return GraphQLType::listOf(GraphQLType::nonNull($this->toGraphQlType($type->getValueType(), $subType, $mapToInputType)));
@@ -730,7 +736,7 @@ class FieldsBuilder
     private function typesWithoutNullable(Type $docBlockTypeHint): array
     {
         if ($docBlockTypeHint instanceof Compound) {
-            $docBlockTypeHints = \iterator_to_array($docBlockTypeHint);
+            $docBlockTypeHints = iterator_to_array($docBlockTypeHint);
         } else {
             $docBlockTypeHints = [$docBlockTypeHint];
         }

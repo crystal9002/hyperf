@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Nacos;
 
 use Hyperf\Nacos\Exception\InvalidArgumentException;
@@ -24,6 +25,7 @@ use Hyperf\Nacos\Provider\ServiceProvider;
  * @property InstanceProvider $instance
  * @property OperatorProvider $operator
  * @property ServiceProvider $service
+ * @property GrpcFactory $grpc
  */
 class Application
 {
@@ -33,6 +35,7 @@ class Application
         'instance' => InstanceProvider::class,
         'operator' => OperatorProvider::class,
         'service' => ServiceProvider::class,
+        'grpc' => GrpcFactory::class,
     ];
 
     protected array $providers = [];

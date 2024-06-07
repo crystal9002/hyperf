@@ -9,8 +9,12 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\Database;
 
+use BadMethodCallException;
+use Hyperf\Collection\Collection;
+use Hyperf\Context\ApplicationContext;
 use Hyperf\Context\Context;
 use Hyperf\Database\ConnectionInterface;
 use Hyperf\Database\Model\Builder as ModelBuilder;
@@ -23,17 +27,21 @@ use Hyperf\Database\Query\Processors\Processor;
 use Hyperf\Di\Container;
 use Hyperf\Paginator\LengthAwarePaginator;
 use Hyperf\Paginator\Paginator;
-use Hyperf\Utils\ApplicationContext;
-use Hyperf\Utils\Collection;
 use InvalidArgumentException;
 use Mockery;
+use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use RuntimeException;
+
+use function Hyperf\Collection\collect;
 
 /**
  * @internal
  * @coversNothing
  */
+#[CoversNothing]
 class QueryBuilderTest extends TestCase
 {
     protected function tearDown(): void
@@ -2191,14 +2199,14 @@ class QueryBuilderTest extends TestCase
     {
         $builder = $this->getMySqlBuilder();
         $builder->select('*')->from('users')->where('items->available', '=', true);
-        $this->assertEquals('select * from `users` where json_unquote(json_extract(`items`, \'$."available"\')) = true', $builder->toSql());
+        $this->assertEquals('select * from `users` where json_extract(`items`, \'$."available"\') = true', $builder->toSql());
     }
 
     public function testMySqlWrappingJsonWithBooleanAndIntegerThatLooksLikeOne()
     {
         $builder = $this->getMySqlBuilder();
         $builder->select('*')->from('users')->where('items->available', '=', true)->where('items->active', '=', false)->where('items->number_available', '=', 0);
-        $this->assertEquals('select * from `users` where json_unquote(json_extract(`items`, \'$."available"\')) = true and json_unquote(json_extract(`items`, \'$."active"\')) = false and json_unquote(json_extract(`items`, \'$."number_available"\')) = ?', $builder->toSql());
+        $this->assertEquals('select * from `users` where json_extract(`items`, \'$."available"\') = true and json_extract(`items`, \'$."active"\') = false and json_unquote(json_extract(`items`, \'$."number_available"\')) = ?', $builder->toSql());
     }
 
     public function testMySqlWrappingJson()
@@ -2293,7 +2301,7 @@ class QueryBuilderTest extends TestCase
 
     public function testBuilderThrowsExpectedExceptionWithUndefinedMethod()
     {
-        $this->expectException(\BadMethodCallException::class);
+        $this->expectException(BadMethodCallException::class);
 
         $builder = $this->getBuilder();
         $builder->getConnection()->shouldReceive('select');
@@ -2998,6 +3006,42 @@ class QueryBuilderTest extends TestCase
         $this->assertEquals(['1520652582'], $builder->getBindings());
     }
 
+    public function testClone()
+    {
+        $builder = $this->getBuilder();
+        $clone = $builder->clone();
+        $this->assertEquals($builder->toSql(), $clone->toSql());
+        $this->assertEquals($builder->getBindings(), $clone->getBindings());
+        $this->assertNotSame($builder, $clone);
+    }
+
+    public function testToRawSql()
+    {
+        $connection = Mockery::mock(ConnectionInterface::class);
+        $connection->shouldReceive('prepareBindings')
+            ->with(['foo'])
+            ->andReturn(['foo']);
+        $connection->shouldReceive('escape')->with('foo')->andReturn('\'foo\'');
+        $grammar = Mockery::mock(Grammar::class)->makePartial();
+        $builder = new Builder($connection, $grammar, Mockery::mock(Processor::class));
+        $builder->select('*')->from('users')->where('email', 'foo');
+
+        $this->assertSame('select * from "users" where "email" = \'foo\'', $builder->toRawSql());
+    }
+
+    public function testQueryBuilderInvalidOperator()
+    {
+        $class = new ReflectionClass(Builder::class);
+        $method = $class->getMethod('invalidOperator');
+        $call = $method->getClosure($this->getMySqlBuilderWithProcessor());
+
+        $this->assertTrue(call_user_func($call, 1));
+        $this->assertTrue(call_user_func($call, '1'));
+        $this->assertFalse(call_user_func($call, '<>'));
+        $this->assertFalse(call_user_func($call, '='));
+        $this->assertTrue(call_user_func($call, '!'));
+    }
+
     protected function getBuilderWithProcessor(): Builder
     {
         return new Builder(Mockery::mock(ConnectionInterface::class), new Grammar(), new Processor());
@@ -3012,7 +3056,7 @@ class QueryBuilderTest extends TestCase
     }
 
     /**
-     * @return Builder|\Mockery\MockInterface
+     * @return Builder|MockInterface
      */
     protected function getMockQueryBuilder()
     {

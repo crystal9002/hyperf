@@ -9,12 +9,16 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Database\Schema;
 
 use Closure;
 use Hyperf\Database\Connection;
 use Hyperf\Database\ConnectionInterface;
+use Hyperf\Database\Schema\Grammars\Grammar as SchemaGrammar;
 use LogicException;
+
+use function Hyperf\Tappable\tap;
 
 class Builder
 {
@@ -28,28 +32,24 @@ class Builder
     /**
      * The database connection instance.
      *
-     * @var \Hyperf\Database\Connection
+     * @var Connection
      */
-    protected $connection;
+    protected ConnectionInterface $connection;
 
     /**
      * The schema grammar instance.
-     *
-     * @var \Hyperf\Database\Schema\Grammars\MySqlGrammar
      */
-    protected $grammar;
+    protected SchemaGrammar $grammar;
 
     /**
      * The Blueprint resolver callback.
-     *
-     * @var \Closure
      */
-    protected $resolver;
+    protected ?Closure $resolver = null;
 
     /**
      * Create a new database Schema manager.
      *
-     * @param \Hyperf\Database\Connection $connection
+     * @param Connection $connection
      */
     public function __construct(ConnectionInterface $connection)
     {
@@ -71,9 +71,8 @@ class Builder
      * Determine if the given table exists.
      *
      * @param string $table
-     * @return bool
      */
-    public function hasTable($table)
+    public function hasTable($table): bool
     {
         $table = $this->connection->getTablePrefix() . $table;
 
@@ -88,9 +87,8 @@ class Builder
      *
      * @param string $table
      * @param string $column
-     * @return bool
      */
-    public function hasColumn($table, $column)
+    public function hasColumn($table, $column): bool
     {
         return in_array(
             strtolower($column),
@@ -102,9 +100,8 @@ class Builder
      * Determine if the given table has given columns.
      *
      * @param string $table
-     * @return bool
      */
-    public function hasColumns($table, array $columns)
+    public function hasColumns($table, array $columns): bool
     {
         $tableColumns = array_map('strtolower', $this->getColumnListing($table));
 
@@ -135,9 +132,8 @@ class Builder
      * Get the column listing for a given table.
      *
      * @param string $table
-     * @return array
      */
-    public function getColumnListing($table)
+    public function getColumnListing($table): array
     {
         $results = $this->connection->selectFromWriteConnection($this->grammar->compileColumnListing(
             $this->connection->getTablePrefix() . $table
@@ -211,7 +207,7 @@ class Builder
     /**
      * Drop all tables from the database.
      *
-     * @throws \LogicException
+     * @throws LogicException
      */
     public function dropAllTables(): void
     {
@@ -221,7 +217,7 @@ class Builder
     /**
      * Drop all views from the database.
      *
-     * @throws \LogicException
+     * @throws LogicException
      */
     public function dropAllViews(): void
     {
@@ -264,7 +260,7 @@ class Builder
     /**
      * Get the database connection instance.
      *
-     * @return \Hyperf\Database\Connection
+     * @return Connection
      */
     public function getConnection()
     {
@@ -293,8 +289,6 @@ class Builder
 
     /**
      * Execute the blueprint to build / modify the table.
-     *
-     * @param \Hyperf\Database\Schema\Blueprint $blueprint
      */
     protected function build(Blueprint $blueprint)
     {
@@ -305,9 +299,9 @@ class Builder
      * Create a new command set with a Closure.
      *
      * @param string $table
-     * @return \Hyperf\Database\Schema\Blueprint
+     * @return Blueprint
      */
-    protected function createBlueprint($table, Closure $callback = null)
+    protected function createBlueprint($table, ?Closure $callback = null)
     {
         $prefix = $this->connection->getConfig('prefix_indexes')
             ? $this->connection->getConfig('prefix')

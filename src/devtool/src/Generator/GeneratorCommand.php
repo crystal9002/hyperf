@@ -9,13 +9,14 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Devtool\Generator;
 
+use Hyperf\CodeParser\Project;
+use Hyperf\Collection\Arr;
+use Hyperf\Context\ApplicationContext;
 use Hyperf\Contract\ConfigInterface;
-use Hyperf\Utils\ApplicationContext;
-use Hyperf\Utils\Arr;
-use Hyperf\Utils\CodeGen\Project;
-use Hyperf\Utils\Str;
+use Hyperf\Stringable\Str;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -42,10 +43,8 @@ abstract class GeneratorCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return int
      */
-    public function execute(InputInterface $input, OutputInterface $output)
+    public function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->input = $input;
         $this->output = $output;

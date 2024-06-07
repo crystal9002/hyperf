@@ -9,55 +9,58 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Watcher\Driver;
 
 use Hyperf\Engine\Channel;
-use Hyperf\Utils\Str;
+use Hyperf\Stringable\Str;
 use Hyperf\Watcher\Option;
-use Swoole\Coroutine\System;
-use Swoole\Timer;
+use InvalidArgumentException;
 
-class FindNewerDriver implements DriverInterface
+use function Hyperf\Watcher\exec;
+
+class FindNewerDriver extends AbstractDriver
 {
     protected string $tmpFile = '/tmp/hyperf_find.php';
 
-    protected bool $scaning = false;
+    protected bool $scanning = false;
 
     protected int $count = 0;
 
     public function __construct(protected Option $option)
     {
-        $ret = System::exec('which find');
+        parent::__construct($option);
+        $ret = exec('which find');
         if (empty($ret['output'])) {
-            throw new \InvalidArgumentException('find not exists.');
+            throw new InvalidArgumentException('find not exists.');
         }
         // create two files
-        System::exec('echo 1 > ' . $this->getToModifyFile());
-        System::exec('echo 1 > ' . $this->getToScanFile());
+        exec('echo 1 > ' . $this->getToModifyFile());
+        exec('echo 1 > ' . $this->getToScanFile());
     }
 
     public function watch(Channel $channel): void
     {
-        $ms = $this->option->getScanInterval();
-        Timer::tick($ms, function () use ($channel) {
-            if ($this->scaning == false) {
-                $this->scaning = true;
-                $changedFiles = $this->scan();
-                ++$this->count;
-                // update mtime
-                if ($changedFiles) {
-                    System::exec('echo 1 > ' . $this->getToModifyFile());
-                    System::exec('echo 1 > ' . $this->getToScanFile());
-                }
-
-                foreach ($changedFiles as $file) {
-                    $channel->push($file);
-                    $this->scaning = false;
-
-                    return;
-                }
-                $this->scaning = false;
+        $seconds = $this->option->getScanIntervalSeconds();
+        $this->timerId = $this->timer->tick($seconds, function () use ($channel) {
+            if ($this->scanning) {
+                return;
             }
+            $this->scanning = true;
+            $changedFiles = $this->scan();
+            ++$this->count;
+            // update mtime
+            if ($changedFiles) {
+                exec('echo 1 > ' . $this->getToModifyFile());
+                exec('echo 1 > ' . $this->getToScanFile());
+            }
+
+            foreach ($changedFiles as $file) {
+                $channel->push($file);
+                $this->scanning = false;
+                return;
+            }
+            $this->scanning = false;
         });
     }
 
@@ -75,7 +78,7 @@ class FindNewerDriver implements DriverInterface
             $shell = $shell . sprintf('find %s -newer %s -type f', $dest, $file) . $symbol;
         }
 
-        $ret = System::exec($shell);
+        $ret = exec($shell);
         if ($ret['code'] === 0 && strlen($ret['output'])) {
             $stdout = $ret['output'];
             $lineArr = explode(PHP_EOL, $stdout);
@@ -97,9 +100,7 @@ class FindNewerDriver implements DriverInterface
     protected function scan(): array
     {
         $ext = $this->option->getExt();
-
         $dirs = array_map(fn ($dir) => BASE_PATH . '/' . $dir, $this->option->getWatchDir());
-
         $files = array_map(fn ($file) => BASE_PATH . '/' . $file, $this->option->getWatchFile());
 
         if ($files) {
@@ -109,13 +110,13 @@ class FindNewerDriver implements DriverInterface
         return $this->find($dirs, $ext);
     }
 
-    protected function getToModifyFile()
+    protected function getToModifyFile(): string
     {
-        return $this->tmpFile . strval($this->count % 2);
+        return $this->tmpFile . ($this->count % 2);
     }
 
-    protected function getToScanFile()
+    protected function getToScanFile(): string
     {
-        return $this->tmpFile . strval(($this->count + 1) % 2);
+        return $this->tmpFile . (($this->count + 1) % 2);
     }
 }

@@ -9,12 +9,14 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Di\Annotation;
 
 use Hyperf\Di\Exception\NotFoundException;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionProperty;
+use Reflector;
 
 /**
  * A reader for docblock annotations.
@@ -79,7 +81,7 @@ class AnnotationReader
         return null;
     }
 
-    public function getAttributes(\Reflector $reflection): array
+    public function getAttributes(Reflector $reflection): array
     {
         $result = [];
         if (! method_exists($reflection, 'getAttributes')) {

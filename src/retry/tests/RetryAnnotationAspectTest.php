@@ -9,8 +9,11 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\Retry;
 
+use Exception;
+use Hyperf\Context\ApplicationContext;
 use Hyperf\Contract\ContainerInterface;
 use Hyperf\Di\Aop\AnnotationMetadata;
 use Hyperf\Di\Aop\AroundInterface;
@@ -24,21 +27,25 @@ use Hyperf\Retry\Annotation\CircuitBreaker;
 use Hyperf\Retry\Annotation\Retry;
 use Hyperf\Retry\Aspect\RetryAnnotationAspect;
 use Hyperf\Retry\BackoffStrategy;
+use Hyperf\Retry\CircuitBreakerState;
 use Hyperf\Retry\FlatStrategy;
 use Hyperf\Retry\NoOpRetryBudget;
 use Hyperf\Retry\Policy\TimeoutRetryPolicy;
 use Hyperf\Retry\RetryBudget;
 use Hyperf\Retry\RetryBudgetInterface;
-use Hyperf\Utils\ApplicationContext;
 use HyperfTest\Retry\Stub\Foo;
+use InvalidArgumentException;
 use Mockery;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Swoole\Timer;
 
 /**
  * @internal
  * @coversNothing
  */
+#[CoversNothing]
 class RetryAnnotationAspectTest extends TestCase
 {
     protected function setUp(): void
@@ -46,7 +53,7 @@ class RetryAnnotationAspectTest extends TestCase
         $container = new Container(new DefinitionSource([
             RetryBudgetInterface::class => NoOpRetryBudget::class,
             RetryBudget::class => NoOpRetryBudget::class,
-            SleepStrategyInterface::class => flatStrategy::class,
+            SleepStrategyInterface::class => FlatStrategy::class,
         ]));
         ApplicationContext::setContainer($container);
     }
@@ -76,8 +83,8 @@ class RetryAnnotationAspectTest extends TestCase
                 }
             }
         );
-        $point->shouldReceive('process')->once()->andThrow(new \RuntimeException());
-        $point->shouldReceive('process')->once()->andThrows(new \Exception());
+        $point->shouldReceive('process')->once()->andThrow(new RuntimeException());
+        $point->shouldReceive('process')->once()->andThrows(new Exception());
         $point->shouldReceive('process')->once()->andReturns(
             true
         );
@@ -106,14 +113,14 @@ class RetryAnnotationAspectTest extends TestCase
         );
         $point->shouldReceive('process')->twice()->andThrowExceptions(
             [
-                new \Exception(),
-                new \Exception(),
+                new Exception(),
+                new Exception(),
             ]
         );
         $point->shouldReceive('process')->never()->andReturns(
             true
         );
-        $this->expectException(\Exception::class);
+        $this->expectException(Exception::class);
         $aspect->process($point);
     }
 
@@ -130,7 +137,7 @@ class RetryAnnotationAspectTest extends TestCase
                 {
                     $retry = new Retry();
                     $retry->sleepStrategyClass = FlatStrategy::class;
-                    $retry->ignoreThrowables = [\RuntimeException::class];
+                    $retry->ignoreThrowables = [RuntimeException::class];
                     $this->method = [
                         AbstractRetry::class => $retry,
                     ];
@@ -139,14 +146,14 @@ class RetryAnnotationAspectTest extends TestCase
         );
         $point->shouldReceive('process')->twice()->andThrowExceptions(
             [
-                new \Exception(),
-                new \RuntimeException(),
+                new Exception(),
+                new RuntimeException(),
             ]
         );
         $point->shouldReceive('process')->never()->andReturns(
             true
         );
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $aspect->process($point);
     }
 
@@ -169,8 +176,8 @@ class RetryAnnotationAspectTest extends TestCase
                 }
             }
         );
-        $point->shouldReceive('process')->once()->andThrows(new \RuntimeException());
-        $point->shouldReceive('process')->once()->andThrows(new \Exception());
+        $point->shouldReceive('process')->once()->andThrows(new RuntimeException());
+        $point->shouldReceive('process')->once()->andThrows(new Exception());
         $point->shouldReceive('process')->once()->andReturns(
             true
         );
@@ -190,19 +197,19 @@ class RetryAnnotationAspectTest extends TestCase
                 {
                     $retry = new Retry();
                     $retry->sleepStrategyClass = BackoffStrategy::class;
-                    $retry->retryThrowables = [\RuntimeException::class];
+                    $retry->retryThrowables = [RuntimeException::class];
                     $this->method = [
                         AbstractRetry::class => $retry,
                     ];
                 }
             }
         );
-        $point->shouldReceive('process')->once()->andThrows(new \RuntimeException());
-        $point->shouldReceive('process')->once()->andThrows(new \InvalidArgumentException());
+        $point->shouldReceive('process')->once()->andThrows(new RuntimeException());
+        $point->shouldReceive('process')->once()->andThrows(new InvalidArgumentException());
         $point->shouldReceive('process')->never()->andReturns(
             true
         );
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $aspect->process($point);
     }
 
@@ -228,12 +235,12 @@ class RetryAnnotationAspectTest extends TestCase
                 }
             }
         );
-        $point->shouldReceive('process')->once()->andThrow(new \RuntimeException('ok'));
-        $point->shouldReceive('process')->once()->andThrows(new \InvalidArgumentException('not ok'));
+        $point->shouldReceive('process')->once()->andThrow(new RuntimeException('ok'));
+        $point->shouldReceive('process')->once()->andThrows(new InvalidArgumentException('not ok'));
         $point->shouldReceive('process')->never()->andReturns(
             true
         );
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->assertTrue($aspect->process($point));
     }
 
@@ -277,7 +284,7 @@ class RetryAnnotationAspectTest extends TestCase
                 public function __construct()
                 {
                     $state = Mockery::mock(
-                        \Hyperf\Retry\CircuitBreakerState::class
+                        CircuitBreakerState::class
                     );
                     $state->shouldReceive('open')->andReturnNull();
                     $state->shouldReceive('isOpen')->twice()->andReturns(false);
@@ -290,9 +297,9 @@ class RetryAnnotationAspectTest extends TestCase
                 }
             }
         );
-        $point->shouldReceive('process')->times(2)->andThrow(new \RuntimeException('ok'));
+        $point->shouldReceive('process')->times(2)->andThrow(new RuntimeException('ok'));
         $point->shouldReceive('getArguments')->andReturns([]);
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $aspect->process($point);
     }
 
@@ -307,7 +314,7 @@ class RetryAnnotationAspectTest extends TestCase
 
                 public function __construct()
                 {
-                    $state = new \Hyperf\Retry\CircuitBreakerState(10);
+                    $state = new CircuitBreakerState(10);
                     $retry = new CircuitBreaker(circuitBreakerState: $state);
                     $retry->sleepStrategyClass = FlatStrategy::class;
                     $retry->fallback = Foo::class . '@fallbackWithThrowable';
@@ -318,7 +325,7 @@ class RetryAnnotationAspectTest extends TestCase
                 }
             }
         );
-        $point->shouldReceive('process')->times(2)->andThrow(new \RuntimeException('ok'));
+        $point->shouldReceive('process')->times(2)->andThrow(new RuntimeException('ok'));
         $point->shouldReceive('getArguments')->andReturns([$string = uniqid()]);
         $result = $aspect->process($point);
         $this->assertSame($string . ':ok', $result);
@@ -349,8 +356,8 @@ class RetryAnnotationAspectTest extends TestCase
                 }
             }
         );
-        $point->shouldReceive('process')->atLeast(3)->andThrow(new \RuntimeException('ok'));
-        $this->expectException(\RuntimeException::class);
+        $point->shouldReceive('process')->atLeast(3)->andThrow(new RuntimeException('ok'));
+        $this->expectException(RuntimeException::class);
         $aspect->process($point);
     }
 
@@ -375,7 +382,7 @@ class RetryAnnotationAspectTest extends TestCase
                 }
             }
         );
-        $point->shouldReceive('process')->andThrow(new \Exception());
+        $point->shouldReceive('process')->andThrow(new Exception());
         $point->shouldReceive('getArguments')->andReturns([]);
         $this->assertEquals(1, $aspect->process($point));
     }
@@ -399,7 +406,7 @@ class RetryAnnotationAspectTest extends TestCase
         $channel->push(false);
         $point->shouldReceive('processOriginalMethod')->andReturnUsing(function () use ($channel) {
             if ($channel->pop(0.001)) {
-                throw new \Exception('broken');
+                throw new Exception('broken');
             }
             return 'pass';
         });

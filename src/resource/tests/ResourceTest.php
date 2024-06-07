@@ -9,14 +9,15 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\Resource;
 
+use Hyperf\Collection\Collection;
 use Hyperf\Paginator\LengthAwarePaginator;
 use Hyperf\Resource\Concerns\ConditionallyLoadsAttributes;
 use Hyperf\Resource\Json\JsonResource;
 use Hyperf\Resource\Value\MergeValue;
 use Hyperf\Resource\Value\MissingValue;
-use Hyperf\Utils\Collection;
 use HyperfTest\Resource\Stubs\Models\Author;
 use HyperfTest\Resource\Stubs\Models\Post;
 use HyperfTest\Resource\Stubs\Models\Subscription;
@@ -32,11 +33,15 @@ use HyperfTest\Resource\Stubs\Resources\PostResourceWithOptionalRelationship;
 use HyperfTest\Resource\Stubs\Resources\PostResourceWithoutWrap;
 use HyperfTest\Resource\Stubs\Resources\ReallyEmptyPostResource;
 use HyperfTest\Resource\Stubs\Resources\ResourceWithPreservedKeys;
+use PHPUnit\Framework\Attributes\CoversNothing;
+
+use function Hyperf\Collection\collect;
 
 /**
  * @internal
  * @coversNothing
  */
+#[CoversNothing]
 class ResourceTest extends TestCase
 {
     public function testResourcesMayBeConvertedToJson()
@@ -70,9 +75,9 @@ class ResourceTest extends TestCase
     public function testAnObjectsMayBeConvertedToJson()
     {
         $this->http(function () {
-            return (ObjectResource::make(
+            return ObjectResource::make(
                 (object) ['first_name' => 'Bob', 'age' => 40]
-            ))->toResponse();
+            )->toResponse();
         })->assertJson([
             'data' => [
                 'name' => 'Bob',
@@ -613,7 +618,7 @@ class ResourceTest extends TestCase
                     'Mohamed',
                     $this->mergeWhen(false, ['Adam', 'Matt']),
                     'Jeffrey',
-                    $this->mergeWhen(false, (['Abigail', 'Lydia'])),
+                    $this->mergeWhen(false, ['Abigail', 'Lydia']),
                 ]);
             }
         };

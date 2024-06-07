@@ -9,13 +9,16 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Database;
 
+use Doctrine\DBAL\Driver\PDO\MySQL\Driver;
 use Hyperf\Database\DBAL\MySqlDriver;
 use Hyperf\Database\Query\Grammars\MySqlGrammar as QueryGrammar;
 use Hyperf\Database\Query\Processors\MySqlProcessor;
 use Hyperf\Database\Schema\Grammars\MySqlGrammar as SchemaGrammar;
 use Hyperf\Database\Schema\MySqlBuilder;
+use PDOStatement;
 
 class MySqlConnection extends Connection
 {
@@ -34,7 +37,7 @@ class MySqlConnection extends Connection
     /**
      * Bind values to their parameters in the given statement.
      */
-    public function bindValues(\PDOStatement $statement, array $bindings): void
+    public function bindValues(PDOStatement $statement, array $bindings): void
     {
         foreach ($bindings as $key => $value) {
             $statement->bindValue(
@@ -46,30 +49,24 @@ class MySqlConnection extends Connection
 
     /**
      * Get the default query grammar instance.
-     *
-     * @return \Hyperf\Database\Query\Grammars\MySqlGrammar
      */
-    protected function getDefaultQueryGrammar()
+    protected function getDefaultQueryGrammar(): QueryGrammar
     {
         return $this->withTablePrefix(new QueryGrammar());
     }
 
     /**
      * Get the default schema grammar instance.
-     *
-     * @return \Hyperf\Database\Schema\Grammars\MySqlGrammar
      */
-    protected function getDefaultSchemaGrammar()
+    protected function getDefaultSchemaGrammar(): SchemaGrammar
     {
         return $this->withTablePrefix(new SchemaGrammar());
     }
 
     /**
      * Get the default post processor instance.
-     *
-     * @return \Hyperf\Database\Query\Processors\MySqlProcessor
      */
-    protected function getDefaultPostProcessor()
+    protected function getDefaultPostProcessor(): MySqlProcessor
     {
         return new MySqlProcessor();
     }
@@ -77,7 +74,7 @@ class MySqlConnection extends Connection
     /**
      * Get the Doctrine DBAL driver.
      *
-     * @return \Doctrine\DBAL\Driver\PDO\MySQL\Driver
+     * @return Driver
      */
     protected function getDoctrineDriver()
     {

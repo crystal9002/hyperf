@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\DbConnection;
 
 use Hyperf\Context\Context;
@@ -17,12 +18,14 @@ use Hyperf\Database\Model\Register;
 use Hyperf\Database\Model\Relations\Pivot;
 use HyperfTest\DbConnection\Stubs\ContainerStub;
 use Mockery;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
 /**
  * @internal
  * @coversNothing
  */
+#[CoversNothing]
 class RelationTest extends TestCase
 {
     protected function tearDown(): void

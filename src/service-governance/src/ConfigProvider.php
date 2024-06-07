@@ -9,11 +9,12 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\ServiceGovernance;
 
 use Hyperf\Contract\IPReaderInterface;
 use Hyperf\ServiceGovernance\Listener\RegisterServiceListener;
-use Hyperf\Utils\IPReader;
+use Hyperf\Support\IPReader;
 
 class ConfigProvider
 {
@@ -25,13 +26,6 @@ class ConfigProvider
             ],
             'listeners' => [
                 RegisterServiceListener::class,
-            ],
-            'annotations' => [
-                'scan' => [
-                    'paths' => [
-                        __DIR__,
-                    ],
-                ],
             ],
             'publish' => [
                 [

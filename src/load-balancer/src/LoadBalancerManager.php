@@ -9,9 +9,12 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\LoadBalancer;
 
 use InvalidArgumentException;
+
+use function Hyperf\Support\make;
 
 class LoadBalancerManager
 {
@@ -51,7 +54,7 @@ class LoadBalancerManager
             return $this->instances[$key];
         }
         $class = $this->get($algorithm);
-        if (function_exists('make')) {
+        if (function_exists('Hyperf\Support\make')) {
             $instance = make($class);
         } else {
             $instance = new $class();

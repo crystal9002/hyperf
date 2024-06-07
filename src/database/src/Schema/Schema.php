@@ -9,14 +9,17 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Database\Schema;
 
+use Hyperf\Context\ApplicationContext;
 use Hyperf\Database\ConnectionInterface;
 use Hyperf\Database\ConnectionResolverInterface;
-use Hyperf\Utils\ApplicationContext;
 
 /**
  * @method static bool hasTable(string $table)
+ * @method static bool createDatabase(string $name)
+ * @method static bool dropDatabaseIfExists(string $name)
  * @method static array getColumnListing(string $table)
  * @method static array getColumnTypeListing(string $table)
  * @method static void dropAllTables()

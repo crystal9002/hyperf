@@ -9,14 +9,17 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\GraphQL;
 
 use phpDocumentor\Reflection\Fqsen;
 use phpDocumentor\Reflection\Type;
+use phpDocumentor\Reflection\TypeResolver;
 use phpDocumentor\Reflection\Types\Object_;
 use phpDocumentor\Reflection\Types\Self_;
 use ReflectionClass;
 use ReflectionMethod;
+use RuntimeException;
 use TheCodingMachine\GraphQLite\MissingTypeHintException;
 use TheCodingMachine\GraphQLite\NamingStrategyInterface;
 
@@ -50,7 +53,7 @@ class InputTypeUtils
         $fqsen = ltrim((string) $this->validateReturnType($method), '\\');
         $factory = $this->annotationReader->getFactoryAnnotation($method);
         if ($factory === null) {
-            throw new \RuntimeException($method->getDeclaringClass()->getName() . '::' . $method->getName() . ' has no @Factory annotation.');
+            throw new RuntimeException($method->getDeclaringClass()->getName() . '::' . $method->getName() . ' has no @Factory annotation.');
         }
         return [$this->namingStrategy->getInputTypeName($fqsen, $factory), $fqsen];
     }
@@ -68,7 +71,7 @@ class InputTypeUtils
 
         $type = (string) $returnType;
 
-        $typeResolver = new \phpDocumentor\Reflection\TypeResolver();
+        $typeResolver = new TypeResolver();
 
         $phpdocType = $typeResolver->resolve($type);
         $phpdocType = $this->resolveSelf($phpdocType, $refMethod->getDeclaringClass());

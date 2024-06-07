@@ -9,17 +9,20 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\Paginator;
 
+use Hyperf\Codec\Json;
 use Hyperf\Paginator\LengthAwarePaginator;
 use Hyperf\Paginator\Paginator;
-use Hyperf\Utils\Codec\Json;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
 /**
  * @internal
  * @coversNothing
  */
+#[CoversNothing]
 class LengthAwarePaginatorTest extends TestCase
 {
     public function testNextPageUrl()
@@ -57,5 +60,11 @@ class LengthAwarePaginatorTest extends TestCase
         $paginator = new Paginator([1, 2], 2, 2);
 
         $this->assertSame(Json::encode($paginator->toArray()), (string) $paginator);
+    }
+
+    public function testGetOptions()
+    {
+        $paginator = new LengthAwarePaginator([1, 2], 10, 2, 2, $options = ['foo' => 'bar']);
+        $this->assertSame($options, $paginator->getOptions());
     }
 }

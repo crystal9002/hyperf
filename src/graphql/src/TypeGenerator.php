@@ -9,9 +9,12 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\GraphQL;
 
 use Psr\Container\ContainerInterface;
+use ReflectionClass;
+use ReflectionException;
 use TheCodingMachine\GraphQLite\Mappers\RecursiveTypeMapperInterface;
 use TheCodingMachine\GraphQLite\MissingAnnotationException;
 use TheCodingMachine\GraphQLite\NamingStrategyInterface;
@@ -65,11 +68,11 @@ class TypeGenerator
 
     /**
      * @param string $annotatedObjectClassName the FQCN of an object with a Type annotation
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function mapAnnotatedObject(string $annotatedObjectClassName, RecursiveTypeMapperInterface $recursiveTypeMapper): MutableObjectType
     {
-        $refTypeClass = new \ReflectionClass($annotatedObjectClassName);
+        $refTypeClass = new ReflectionClass($annotatedObjectClassName);
 
         $typeField = $this->annotationReader->getTypeAnnotation($refTypeClass);
 
@@ -97,7 +100,7 @@ class TypeGenerator
      */
     public function extendAnnotatedObject($annotatedObject, MutableObjectType $type, RecursiveTypeMapperInterface $recursiveTypeMapper)
     {
-        $refTypeClass = new \ReflectionClass($annotatedObject);
+        $refTypeClass = new ReflectionClass($annotatedObject);
 
         $extendTypeAnnotation = $this->annotationReader->getExtendTypeAnnotation($refTypeClass);
 

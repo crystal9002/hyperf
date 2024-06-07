@@ -9,9 +9,12 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Validation\Rules;
 
 use Closure;
+
+use function Hyperf\Collection\collect;
 
 trait DatabaseRule
 {
@@ -138,6 +141,6 @@ trait DatabaseRule
      */
     protected function formatWheres(): string
     {
-        return collect($this->wheres)->map(fn ($where) => $where['column'] . ',' . '"' . str_replace('"', '""', (string) $where['value']) . '"')->implode(',');
+        return collect($this->wheres)->map(fn ($where) => $where['column'] . ',"' . str_replace('"', '""', (string) $where['value']) . '"')->implode(',');
     }
 }

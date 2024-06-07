@@ -9,13 +9,20 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Database;
 
 use Closure;
 use DateTimeInterface;
 use Doctrine\DBAL\Connection as DoctrineConnection;
+use Doctrine\DBAL\Schema\AbstractSchemaManager;
+use Doctrine\DBAL\Schema\Column;
 use Exception;
+use Generator;
+use Hyperf\Collection\Arr;
+use Hyperf\Contracts\Events\Dispatcher;
 use Hyperf\Database\Events\QueryExecuted;
+use Hyperf\Database\Exception\InvalidArgumentException;
 use Hyperf\Database\Exception\QueryException;
 use Hyperf\Database\Query\Builder;
 use Hyperf\Database\Query\Builder as QueryBuilder;
@@ -23,11 +30,13 @@ use Hyperf\Database\Query\Expression;
 use Hyperf\Database\Query\Grammars\Grammar as QueryGrammar;
 use Hyperf\Database\Query\Processors\Processor;
 use Hyperf\Database\Schema\Builder as SchemaBuilder;
-use Hyperf\Utils\Arr;
+use Hyperf\Database\Schema\Grammars\Grammar as SchemaGrammar;
 use LogicException;
 use PDO;
 use PDOStatement;
 use Psr\EventDispatcher\EventDispatcherInterface;
+use RuntimeException;
+use Throwable;
 
 class Connection implements ConnectionInterface
 {
@@ -40,77 +49,61 @@ class Connection implements ConnectionInterface
      *
      * @var Closure|PDO
      */
-    protected $pdo;
+    protected mixed $pdo;
 
     /**
      * The active PDO connection used for reads.
      *
      * @var Closure|PDO
      */
-    protected $readPdo;
+    protected mixed $readPdo = null;
 
     /**
      * The name of the connected database.
-     *
-     * @var string
      */
-    protected $database;
+    protected string $database;
 
     /**
      * The table prefix for the connection.
-     *
-     * @var string
      */
-    protected $tablePrefix = '';
+    protected string $tablePrefix = '';
 
     /**
      * The database connection configuration options.
-     *
-     * @var array
      */
-    protected $config = [];
+    protected array $config = [];
 
     /**
      * The reconnector instance for the connection.
      *
      * @var callable
      */
-    protected $reconnector;
+    protected mixed $reconnector = null;
 
     /**
      * The query grammar implementation.
-     *
-     * @var \Hyperf\Database\Query\Grammars\Grammar
      */
-    protected $queryGrammar;
+    protected QueryGrammar $queryGrammar;
 
     /**
      * The schema grammar implementation.
-     *
-     * @var \Hyperf\Database\Schema\Grammars\Grammar
      */
-    protected $schemaGrammar;
+    protected ?SchemaGrammar $schemaGrammar = null;
 
     /**
      * The query post processor implementation.
-     *
-     * @var \Hyperf\Database\Query\Processors\Processor
      */
-    protected $postProcessor;
+    protected Processor $postProcessor;
 
     /**
      * The event dispatcher instance.
-     *
-     * @var EventDispatcherInterface
      */
-    protected $events;
+    protected ?EventDispatcherInterface $events = null;
 
     /**
      * The default fetch mode of the connection.
-     *
-     * @var int
      */
-    protected $fetchMode = PDO::FETCH_OBJ;
+    protected int $fetchMode = PDO::FETCH_OBJ;
 
     /**
      * The number of active transactions.
@@ -140,12 +133,13 @@ class Connection implements ConnectionInterface
     /**
      * The instance of Doctrine connection.
      *
-     * @var \Doctrine\DBAL\Connection
+     * @var DoctrineConnection
      */
-    protected $doctrineConnection;
+    protected mixed $doctrineConnection = null;
 
     /**
      * The connection resolvers.
+     * @var Closure[]
      */
     protected static array $resolvers = [];
 
@@ -157,13 +151,16 @@ class Connection implements ConnectionInterface
     protected static array $beforeExecutingCallbacks = [];
 
     /**
+     * Error count for executing SQL.
+     */
+    protected int $errorCount = 0;
+
+    /**
      * Create a new database connection instance.
      *
      * @param Closure|PDO $pdo
-     * @param string $database
-     * @param string $tablePrefix
      */
-    public function __construct($pdo, $database = '', $tablePrefix = '', array $config = [])
+    public function __construct(mixed $pdo, string $database = '', string $tablePrefix = '', array $config = [])
     {
         $this->pdo = $pdo;
 
@@ -210,9 +207,8 @@ class Connection implements ConnectionInterface
 
     /**
      * Get a schema builder instance for the connection.
-     * @return SchemaBuilder
      */
-    public function getSchemaBuilder()
+    public function getSchemaBuilder(): SchemaBuilder
     {
         if (is_null($this->schemaGrammar)) {
             $this->useDefaultSchemaGrammar();
@@ -287,7 +283,7 @@ class Connection implements ConnectionInterface
     /**
      * Run a select statement against the database and returns a generator.
      */
-    public function cursor(string $query, array $bindings = [], bool $useReadPdo = true): \Generator
+    public function cursor(string $query, array $bindings = [], bool $useReadPdo = true): Generator
     {
         $statement = $this->run($query, $bindings, function ($query, $bindings) use ($useReadPdo) {
             if ($this->pretending()) {
@@ -463,7 +459,7 @@ class Connection implements ConnectionInterface
 
     /**
      * Log a query in the connection's query log.
-     * @param null|array|int|\Throwable $result
+     * @param null|array|int|Throwable $result
      */
     public function logQuery(string $query, array $bindings, ?float $time = null, $result = null)
     {
@@ -477,7 +473,7 @@ class Connection implements ConnectionInterface
     /**
      * Reconnect to the database.
      *
-     * @throws \LogicException
+     * @throws LogicException
      */
     public function reconnect()
     {
@@ -518,9 +514,7 @@ class Connection implements ConnectionInterface
     public function listen(Closure $callback)
     {
         // FIXME: Dynamic register query event.
-        if (isset($this->events)) {
-            $this->events->listen(Events\QueryExecuted::class, $callback);
-        }
+        $this->events?->listen(QueryExecuted::class, $callback);
     }
 
     /**
@@ -530,6 +524,36 @@ class Connection implements ConnectionInterface
     public function raw($value): Expression
     {
         return new Expression($value);
+    }
+
+    /**
+     * Escape a value for safe SQL embedding.
+     *
+     * @param null|bool|float|int|string $value
+     */
+    public function escape(mixed $value, bool $binary = false): string
+    {
+        if ($value === null) {
+            return 'null';
+        }
+        if ($binary) {
+            return $this->escapeBinary($value);
+        }
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+        if (is_bool($value)) {
+            return $this->escapeBool($value);
+        }
+        if (str_contains($value, "\00")) {
+            throw new RuntimeException('Strings with null bytes cannot be escaped. Use the binary escape option.');
+        }
+
+        if (preg_match('//u', $value) === false) {
+            throw new RuntimeException('Strings with invalid UTF-8 byte sequences cannot be escaped.');
+        }
+
+        return $this->escapeString($value);
     }
 
     /**
@@ -563,7 +587,7 @@ class Connection implements ConnectionInterface
      *
      * @param string $table
      * @param string $column
-     * @return \Doctrine\DBAL\Schema\Column
+     * @return Column
      */
     public function getDoctrineColumn($table, $column)
     {
@@ -575,7 +599,7 @@ class Connection implements ConnectionInterface
     /**
      * Get the Doctrine DBAL schema manager for the connection.
      *
-     * @return \Doctrine\DBAL\Schema\AbstractSchemaManager
+     * @return AbstractSchemaManager
      */
     public function getDoctrineSchemaManager()
     {
@@ -590,7 +614,7 @@ class Connection implements ConnectionInterface
     /**
      * Get the Doctrine DBAL database connection instance.
      *
-     * @return \Doctrine\DBAL\Connection
+     * @return DoctrineConnection
      */
     public function getDoctrineConnection()
     {
@@ -610,7 +634,7 @@ class Connection implements ConnectionInterface
     /**
      * Get the current PDO connection.
      *
-     * @return \PDO
+     * @return PDO
      */
     public function getPdo()
     {
@@ -624,7 +648,7 @@ class Connection implements ConnectionInterface
     /**
      * Get the current PDO connection used for reading.
      *
-     * @return \PDO
+     * @return PDO
      */
     public function getReadPdo()
     {
@@ -653,7 +677,10 @@ class Connection implements ConnectionInterface
     {
         $this->transactions = 0;
 
-        $this->pdo = $pdo;
+        try {
+            $this->pdo = $pdo;
+        } catch (Exception) {
+        }
 
         return $this;
     }
@@ -666,17 +693,18 @@ class Connection implements ConnectionInterface
      */
     public function setReadPdo($pdo)
     {
-        $this->readPdo = $pdo;
+        try {
+            $this->readPdo = $pdo;
+        } catch (Exception) {
+        }
 
         return $this;
     }
 
     /**
      * Set the reconnect instance on the connection.
-     *
-     * @return $this
      */
-    public function setReconnector(callable $reconnector)
+    public function setReconnector(callable $reconnector): static
     {
         $this->reconnector = $reconnector;
 
@@ -716,7 +744,7 @@ class Connection implements ConnectionInterface
     /**
      * Get the query grammar used by the connection.
      *
-     * @return \Hyperf\Database\Query\Grammars\Grammar
+     * @return QueryGrammar
      */
     public function getQueryGrammar()
     {
@@ -726,10 +754,9 @@ class Connection implements ConnectionInterface
     /**
      * Set the query grammar used by the connection.
      *
-     * @param \Hyperf\Database\Query\Grammars\Grammar $grammar
      * @return $this
      */
-    public function setQueryGrammar(Query\Grammars\Grammar $grammar)
+    public function setQueryGrammar(QueryGrammar $grammar)
     {
         $this->queryGrammar = $grammar;
 
@@ -738,21 +765,22 @@ class Connection implements ConnectionInterface
 
     /**
      * Get the schema grammar used by the connection.
-     *
-     * @return \Hyperf\Database\Schema\Grammars\Grammar
      */
-    public function getSchemaGrammar()
+    public function getSchemaGrammar(): SchemaGrammar
     {
+        if (is_null($this->schemaGrammar)) {
+            $this->useDefaultSchemaGrammar();
+        }
+
         return $this->schemaGrammar;
     }
 
     /**
      * Set the schema grammar used by the connection.
      *
-     * @param \Hyperf\Database\Schema\Grammars\Grammar $grammar
      * @return $this
      */
-    public function setSchemaGrammar(Schema\Grammars\Grammar $grammar)
+    public function setSchemaGrammar(SchemaGrammar $grammar)
     {
         $this->schemaGrammar = $grammar;
 
@@ -761,20 +789,16 @@ class Connection implements ConnectionInterface
 
     /**
      * Get the query post processor used by the connection.
-     *
-     * @return \Hyperf\Database\Query\Processors\Processor
      */
-    public function getPostProcessor()
+    public function getPostProcessor(): Processor
     {
         return $this->postProcessor;
     }
 
     /**
      * Set the query post processor used by the connection.
-     *
-     * @return $this
      */
-    public function setPostProcessor(Processor $processor)
+    public function setPostProcessor(Processor $processor): static
     {
         $this->postProcessor = $processor;
 
@@ -784,7 +808,7 @@ class Connection implements ConnectionInterface
     /**
      * Get the event dispatcher used by the connection.
      *
-     * @return \Hyperf\Contracts\Events\Dispatcher
+     * @return Dispatcher
      */
     public function getEventDispatcher()
     {
@@ -829,6 +853,22 @@ class Connection implements ConnectionInterface
     public function getQueryLog()
     {
         return $this->queryLog;
+    }
+
+    /**
+     * Get the connection query log with embedded bindings.
+     *
+     * @return array
+     */
+    public function getRawQueryLog()
+    {
+        return array_map(fn (array $log) => [
+            'raw_query' => $this->queryGrammar->substituteBindingsIntoRawSql(
+                $log['query'],
+                array_map(fn ($value) => $this->escape($value), $this->prepareBindings($log['bindings']))
+            ),
+            'time' => $log['time'],
+        ], $this->getQueryLog());
     }
 
     /**
@@ -890,21 +930,16 @@ class Connection implements ConnectionInterface
 
     /**
      * Get the table prefix for the connection.
-     *
-     * @return string
      */
-    public function getTablePrefix()
+    public function getTablePrefix(): string
     {
         return $this->tablePrefix;
     }
 
     /**
      * Set the table prefix in use by the connection.
-     *
-     * @param string $prefix
-     * @return $this
      */
-    public function setTablePrefix($prefix)
+    public function setTablePrefix(string $prefix): static
     {
         $this->tablePrefix = $prefix;
 
@@ -915,11 +950,8 @@ class Connection implements ConnectionInterface
 
     /**
      * Set the table prefix and return the grammar.
-     *
-     * @param \Hyperf\Database\Grammar $grammar
-     * @return \Hyperf\Database\Grammar
      */
-    public function withTablePrefix(Grammar $grammar)
+    public function withTablePrefix(Grammar $grammar): Grammar
     {
         $grammar->setTablePrefix($this->tablePrefix);
 
@@ -928,49 +960,69 @@ class Connection implements ConnectionInterface
 
     /**
      * Register a connection resolver.
-     *
-     * @param string $driver
      */
-    public static function resolverFor($driver, Closure $callback)
+    public static function resolverFor(string $driver, Closure $callback)
     {
         static::$resolvers[$driver] = $callback;
     }
 
     /**
      * Get the connection resolver for the given driver.
-     *
-     * @param string $driver
      */
-    public static function getResolver($driver)
+    public static function getResolver(string $driver): ?Closure
     {
         return static::$resolvers[$driver] ?? null;
     }
 
+    public function getErrorCount(): int
+    {
+        return $this->errorCount;
+    }
+
+    /**
+     * Escape a string value for safe SQL embedding.
+     */
+    protected function escapeString(string $value): string
+    {
+        return $this->getPdo()->quote($value);
+    }
+
+    /**
+     * Escape a boolean value for safe SQL embedding.
+     */
+    protected function escapeBool(bool $value): string
+    {
+        return $value ? '1' : '0';
+    }
+
+    /**
+     * Escape a binary value for safe SQL embedding.
+     */
+    protected function escapeBinary(mixed $value): string
+    {
+        throw new RuntimeException('The database connection does not support escaping binary values.');
+    }
+
     /**
      * Get the default query grammar instance.
-     *
-     * @return \Hyperf\Database\Query\Grammars\Grammar
      */
-    protected function getDefaultQueryGrammar()
+    protected function getDefaultQueryGrammar(): QueryGrammar
     {
         return new QueryGrammar();
     }
 
     /**
      * Get the default schema grammar instance.
-     *
-     * @return \Hyperf\Database\Schema\Grammars\Grammar
      */
-    protected function getDefaultSchemaGrammar()
+    protected function getDefaultSchemaGrammar(): SchemaGrammar
     {
+        throw new InvalidArgumentException("Don't has the default grammar.");
     }
 
     /**
      * Get the default post processor instance.
-     *
-     * @return \Hyperf\Database\Query\Processors\Processor
      */
-    protected function getDefaultPostProcessor()
+    protected function getDefaultPostProcessor(): Processor
     {
         return new Processor();
     }
@@ -996,7 +1048,7 @@ class Connection implements ConnectionInterface
      * Get the PDO connection to use for a select query.
      *
      * @param bool $useReadPdo
-     * @return \PDO
+     * @return PDO
      */
     protected function getPdoForSelect($useReadPdo = true)
     {
@@ -1075,11 +1127,9 @@ class Connection implements ConnectionInterface
     /**
      * Run a SQL statement.
      *
-     * @param string $query
-     * @param array $bindings
      * @throws QueryException
      */
-    protected function runQueryCallback($query, $bindings, Closure $callback)
+    protected function runQueryCallback(string $query, array $bindings, Closure $callback)
     {
         // To execute the statement, we'll simply call the callback, which will actually
         // run the SQL against the PDO connection. Then we can calculate the time it
@@ -1092,11 +1142,15 @@ class Connection implements ConnectionInterface
         // message to include the bindings with SQL, which will make this exception a
         // lot more helpful to the developer instead of just the database's errors.
         catch (Exception $e) {
+            ++$this->errorCount;
             throw new QueryException(
                 $query,
                 $this->prepareBindings($bindings),
                 $e
             );
+        } catch (Throwable $throwable) {
+            ++$this->errorCount;
+            throw $throwable;
         }
 
         return $result;
@@ -1113,13 +1167,9 @@ class Connection implements ConnectionInterface
     /**
      * Handle a query exception.
      *
-     * @param \Exception $e
-     * @param string $query
-     * @param array $bindings
-     *
-     * @throws \Exception
+     * @throws Exception
      */
-    protected function handleQueryException($e, $query, $bindings, Closure $callback)
+    protected function handleQueryException(QueryException $e, string $query, array $bindings, Closure $callback)
     {
         if ($this->transactions >= 1) {
             throw $e;
@@ -1136,11 +1186,9 @@ class Connection implements ConnectionInterface
     /**
      * Handle a query exception that occurred during query execution.
      *
-     * @param string $query
-     * @param array $bindings
      * @throws QueryException
      */
-    protected function tryAgainIfCausedByLostConnection(QueryException $e, $query, $bindings, Closure $callback)
+    protected function tryAgainIfCausedByLostConnection(QueryException $e, string $query, array $bindings, Closure $callback)
     {
         if ($this->causedByLostConnection($e->getPrevious())) {
             $this->reconnect();
@@ -1169,28 +1217,20 @@ class Connection implements ConnectionInterface
      */
     protected function fireConnectionEvent($event)
     {
-        if (! isset($this->events)) {
-            return;
-        }
-
-        switch ($event) {
-            case 'beganTransaction':
-                return $this->events->dispatch(new Events\TransactionBeginning($this));
-            case 'committed':
-                return $this->events->dispatch(new Events\TransactionCommitted($this));
-            case 'rollingBack':
-                return $this->events->dispatch(new Events\TransactionRolledBack($this));
-        }
+        return match ($event) {
+            'beganTransaction' => $this->event(new Events\TransactionBeginning($this)),
+            'committed' => $this->event(new Events\TransactionCommitted($this)),
+            'rollingBack' => $this->event(new Events\TransactionRolledBack($this)),
+        };
     }
 
     /**
      * Fire the given event if possible.
-     * @param mixed $event
+     * @param object $event
+     * @return object
      */
     protected function event($event)
     {
-        if (isset($this->events)) {
-            $this->events->dispatch($event);
-        }
+        return $this->events?->dispatch($event);
     }
 }

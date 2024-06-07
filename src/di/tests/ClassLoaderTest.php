@@ -9,11 +9,21 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\Di;
 
 use Hyperf\Di\ClassLoader;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 
+use function Hyperf\Support\env;
+
+/**
+ * @internal
+ * @coversNothing
+ */
+#[CoversNothing]
 /**
  * @internal
  * @coversNothing
@@ -28,9 +38,8 @@ class ClassLoaderTest extends TestCase
             }
         };
 
-        $ref = new \ReflectionClass($class);
+        $ref = new ReflectionClass($class);
         $method = $ref->getMethod('loadDotenv');
-        $method->setAccessible(true);
         $method->invoke($class);
 
         $this->assertNotEquals('0.0.0', env('SW_VERSION'));

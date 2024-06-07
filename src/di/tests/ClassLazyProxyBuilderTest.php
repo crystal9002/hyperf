@@ -9,21 +9,24 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\Di;
 
+use Hyperf\CodeParser\PhpParser;
 use Hyperf\Di\LazyLoader\ClassLazyProxyBuilder;
 use Hyperf\Di\LazyLoader\PublicMethodVisitor;
-use Hyperf\Utils\CodeGen\PhpParser;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\ParserFactory;
 use PhpParser\PrettyPrinter\Standard;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
 /**
  * @internal
  * @coversNothing
  */
+#[CoversNothing]
 class ClassLazyProxyBuilderTest extends TestCase
 {
     public function testVisitClass()

@@ -9,16 +9,17 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Di\Annotation;
 
 use Hyperf\Config\ProviderConfig;
 use Hyperf\Di\Aop\ProxyManager;
-use Hyperf\Di\ClassLoader;
 use Hyperf\Di\Exception\DirectoryNotExistException;
 use Hyperf\Di\MetadataCollector;
 use Hyperf\Di\ReflectionManager;
 use Hyperf\Di\ScanHandler\ScanHandlerInterface;
-use Hyperf\Utils\Filesystem\Filesystem;
+use Hyperf\Support\Composer;
+use Hyperf\Support\Filesystem\Filesystem;
 use ReflectionClass;
 
 class Scanner
@@ -27,7 +28,7 @@ class Scanner
 
     protected string $path = BASE_PATH . '/runtime/container/scan.cache';
 
-    public function __construct(protected ClassLoader $classloader, protected ScanConfig $scanConfig, protected ScanHandlerInterface $handler)
+    public function __construct(protected ScanConfig $scanConfig, protected ScanHandlerInterface $handler)
     {
         $this->filesystem = new Filesystem();
     }
@@ -131,8 +132,9 @@ class Scanner
         $classMap = array_merge($reflectionClassMap, $classMap);
         $proxyManager = new ProxyManager($classMap, $proxyDir);
         $proxies = $proxyManager->getProxies();
+        $aspectClasses = $proxyManager->getAspectClasses();
 
-        $this->putCache($this->path, serialize([$data, $proxies]));
+        $this->putCache($this->path, serialize([$data, $proxies, $aspectClasses]));
         exit;
     }
 
@@ -171,23 +173,6 @@ class Scanner
         }
 
         return $proxies;
-    }
-
-    protected function deserializeCachedCollectors(array $collectors): int
-    {
-        if (! file_exists($this->path)) {
-            return 0;
-        }
-
-        $data = unserialize(file_get_contents($this->path));
-        foreach ($data as $collector => $deserialized) {
-            /** @var MetadataCollector $collector */
-            if (in_array($collector, $collectors)) {
-                $collector::deserialize($deserialized);
-            }
-        }
-
-        return $this->filesystem->lastModified($this->path);
     }
 
     /**
@@ -313,7 +298,7 @@ class Scanner
             }
         }
         foreach ($classes as $class) {
-            $file = $this->classloader->getComposerClassLoader()->findFile($class);
+            $file = Composer::getLoader()->findFile($class);
             if ($file === false) {
                 echo sprintf('Skip class %s, because it does not exist in composer class loader.', $class) . PHP_EOL;
                 continue;

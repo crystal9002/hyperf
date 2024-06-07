@@ -9,13 +9,16 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\Resource;
 
+use Hyperf\Collection\Arr;
 use Hyperf\HttpMessage\Server\Response;
-use Hyperf\Utils\Arr;
-use Hyperf\Utils\Str;
+use Hyperf\Stringable\Str;
 use PHPUnit\Framework\Assert as PHPUnit;
 use Psr\Http\Message\ResponseInterface as PsrResponseInterface;
+
+use function Hyperf\Collection\data_get;
 
 /**
  * Class HttpResponse.
@@ -192,12 +195,11 @@ class HttpResponse
      */
     public function assertJson(array $data, $strict = false)
     {
-        PHPUnit::assertArraySubset(
-            $data,
-            $this->decodeResponseJson(),
-            $strict,
-            $this->assertJsonMessage($data)
-        );
+        if ($strict) {
+            PHPUnit::assertSame($data, $this->decodeResponseJson());
+        } else {
+            PHPUnit::assertEquals($data, $this->decodeResponseJson());
+        }
 
         return $this;
     }
@@ -308,7 +310,7 @@ class HttpResponse
      * @param null|array $responseData
      * @return $this
      */
-    public function assertJsonStructure(array $structure = null, $responseData = null)
+    public function assertJsonStructure(?array $structure = null, $responseData = null)
     {
         if (is_null($structure)) {
             return $this->assertExactJson($this->json());

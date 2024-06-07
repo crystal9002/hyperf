@@ -9,16 +9,20 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\ViewEngine\Compiler;
 
-use Hyperf\Utils\Filesystem\Filesystem;
-use Hyperf\Utils\Str;
+use Hyperf\Stringable\Str;
+use Hyperf\Support\Filesystem\Filesystem;
 use Hyperf\ViewEngine\Blade;
 use Hyperf\ViewEngine\Component\AnonymousComponent;
 use Hyperf\ViewEngine\Contract\FactoryInterface;
 use Hyperf\ViewEngine\Contract\FinderInterface;
 use InvalidArgumentException;
+use PhpToken;
 use ReflectionClass;
+
+use function Hyperf\Collection\collect;
 
 class ComponentTagCompiler
 {
@@ -114,8 +118,6 @@ class ComponentTagCompiler
 
     /**
      * Guess the view or class name for the given component.
-     *
-     * @return string
      */
     public function guessComponentFromAutoload(FactoryInterface $viewFactory, string $component): ?string
     {
@@ -481,7 +483,7 @@ class ComponentTagCompiler
      */
     protected function escapeSingleQuotesOutsideOfPhpBlocks(string $value): string
     {
-        return collect(\PhpToken::tokenize($value))->map(function (\PhpToken $token) {
+        return collect(PhpToken::tokenize($value))->map(function (PhpToken $token) {
             return $token->id === T_INLINE_HTML ? str_replace("'", "\\'", $token->text) : $token->text;
         })->implode('');
     }

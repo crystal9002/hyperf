@@ -9,15 +9,19 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Scout\Engine;
 
 use Elasticsearch\Client;
 use Elasticsearch\Client as Elastic;
+use Hyperf\Collection\Collection as BaseCollection;
 use Hyperf\Database\Model\Collection;
 use Hyperf\Database\Model\Model;
 use Hyperf\Scout\Builder;
 use Hyperf\Scout\SearchableInterface;
-use Hyperf\Utils\Collection as BaseCollection;
+use Throwable;
+
+use function Hyperf\Collection\collect;
 
 class ElasticsearchEngine extends Engine
 {
@@ -38,9 +42,7 @@ class ElasticsearchEngine extends Engine
      */
     public function __construct(protected Client $elastic, ?string $index = null)
     {
-        if ($index) {
-            $this->index = $this->initIndex($elastic, $index);
-        }
+        $this->index = $this->initIndex($elastic, $index);
     }
 
     /**
@@ -63,6 +65,7 @@ class ElasticsearchEngine extends Engine
                 $update = [
                     '_id' => $model->getKey(),
                     '_index' => $model->searchableAs(),
+                    ...$this->appendType(),
                 ];
             }
             $params['body'][] = ['update' => $update];
@@ -94,6 +97,7 @@ class ElasticsearchEngine extends Engine
                 $delete = [
                     '_id' => $model->getKey(),
                     '_index' => $model->searchableAs(),
+                    ...$this->appendType(),
                 ];
             }
             $params['body'][] = ['delete' => $delete];
@@ -188,12 +192,12 @@ class ElasticsearchEngine extends Engine
             ->unsearchable();
     }
 
-    protected function initIndex(Client $client, string $index): ?string
+    protected function initIndex(Client $client, ?string $index): ?string
     {
         if (! static::$version) {
             try {
                 static::$version = $client->info()['version']['number'];
-            } catch (\Throwable $exception) {
+            } catch (Throwable $exception) {
                 static::$version = '0.0.0';
             }
         }
@@ -283,5 +287,16 @@ class ElasticsearchEngine extends Engine
         return collect($builder->orders)->map(function ($order) {
             return [$order['column'] => $order['direction']];
         })->toArray();
+    }
+
+    protected function appendType(): array
+    {
+        if (version_compare(static::$version, '7.0.0', '<')) {
+            return [
+                '_type' => 'doc',
+            ];
+        }
+
+        return [];
     }
 }

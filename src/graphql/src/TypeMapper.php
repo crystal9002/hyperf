@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\GraphQL;
 
 use GraphQL\Type\Definition\InputObjectType;
@@ -17,6 +18,7 @@ use Hyperf\GraphQL\Annotation\Type;
 use Psr\Container\ContainerInterface;
 use Psr\SimpleCache\CacheInterface;
 use ReflectionClass;
+use ReflectionException;
 use ReflectionMethod;
 use Symfony\Component\Lock\Factory as LockFactory;
 use Symfony\Component\Lock\Lock;
@@ -28,7 +30,9 @@ use TheCodingMachine\GraphQLite\Mappers\RecursiveTypeMapperInterface;
 use TheCodingMachine\GraphQLite\Mappers\TypeMapperInterface;
 use TheCodingMachine\GraphQLite\NamingStrategyInterface;
 use TheCodingMachine\GraphQLite\Types\MutableObjectType;
+
 use function array_keys;
+use function class_exists;
 use function filemtime;
 
 /**
@@ -258,9 +262,9 @@ class TypeMapper implements TypeMapperInterface
      * Returns a GraphQL type by name (can be either an input or output type).
      *
      * @param string $typeName The name of the GraphQL type
-     * @throws CannotMapTypeExceptionInterface
-     * @throws \ReflectionException
      * @return \GraphQL\Type\Definition\Type&(InputType|OutputType)
+     * @throws CannotMapTypeExceptionInterface
+     * @throws ReflectionException
      */
     public function mapNameToType(string $typeName, RecursiveTypeMapperInterface $recursiveTypeMapper): \GraphQL\Type\Definition\Type
     {
@@ -544,10 +548,10 @@ class TypeMapper implements TypeMapperInterface
             $this->classes = [];
             $classes = ClassCollector::getClasses();
             foreach ($classes as $className) {
-                if (! \class_exists($className)) {
+                if (! class_exists($className)) {
                     continue;
                 }
-                $refClass = new \ReflectionClass($className);
+                $refClass = new ReflectionClass($className);
                 if (! $refClass->isInstantiable()) {
                     continue;
                 }

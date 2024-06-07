@@ -9,10 +9,13 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Database;
 
 use Hyperf\Database\Query\Expression;
 use Hyperf\Macroable\Macroable;
+
+use function Hyperf\Collection\collect;
 
 abstract class Grammar
 {
@@ -20,17 +23,13 @@ abstract class Grammar
 
     /**
      * The grammar table prefix.
-     *
-     * @var string
      */
-    protected $tablePrefix = '';
+    protected string $tablePrefix = '';
 
     /**
      * Wrap an array of values.
-     *
-     * @return array
      */
-    public function wrapArray(array $values)
+    public function wrapArray(array $values): array
     {
         return array_map([$this, 'wrap'], $values);
     }
@@ -38,7 +37,7 @@ abstract class Grammar
     /**
      * Wrap a table in keyword identifiers.
      *
-     * @param \Hyperf\Database\Query\Expression|string $table
+     * @param Expression|string $table
      * @return string
      */
     public function wrapTable($table)
@@ -53,11 +52,10 @@ abstract class Grammar
     /**
      * Wrap a value in keyword identifiers.
      *
-     * @param \Hyperf\Database\Query\Expression|string $value
      * @param bool $prefixAlias
      * @return string
      */
-    public function wrap($value, $prefixAlias = false)
+    public function wrap(Expression|string $value, $prefixAlias = false)
     {
         if ($this->isExpression($value)) {
             return $this->getValue($value);
@@ -83,10 +81,8 @@ abstract class Grammar
 
     /**
      * Create query parameter place-holders for an array.
-     *
-     * @return string
      */
-    public function parameterize(array $values)
+    public function parameterize(array $values): string
     {
         return implode(', ', array_map([$this, 'parameter'], $values));
     }
@@ -94,10 +90,9 @@ abstract class Grammar
     /**
      * Get the appropriate query parameter place-holder for a value.
      *
-     * @param mixed $value
      * @return string
      */
-    public function parameter($value)
+    public function parameter(mixed $value)
     {
         return $this->isExpression($value) ? $this->getValue($value) : '?';
     }
@@ -106,9 +101,8 @@ abstract class Grammar
      * Quote the given string literal.
      *
      * @param array|string $value
-     * @return string
      */
-    public function quoteString($value)
+    public function quoteString($value): string
     {
         if (is_array($value)) {
             return implode(', ', array_map([$this, __FUNCTION__], $value));
@@ -119,11 +113,8 @@ abstract class Grammar
 
     /**
      * Determine if the given value is a raw expression.
-     *
-     * @param mixed $value
-     * @return bool
      */
-    public function isExpression($value)
+    public function isExpression(mixed $value): bool
     {
         return $value instanceof Expression;
     }
@@ -131,10 +122,9 @@ abstract class Grammar
     /**
      * Get the value of a raw expression.
      *
-     * @param \Hyperf\Database\Query\Expression $expression
      * @return string
      */
-    public function getValue($expression)
+    public function getValue(Expression $expression)
     {
         return $expression->getValue();
     }
@@ -149,10 +139,8 @@ abstract class Grammar
 
     /**
      * Get the grammar's table prefix.
-     *
-     * @return string
      */
-    public function getTablePrefix()
+    public function getTablePrefix(): string
     {
         return $this->tablePrefix;
     }
@@ -160,10 +148,9 @@ abstract class Grammar
     /**
      * Set the grammar's table prefix.
      *
-     * @param string $prefix
      * @return $this
      */
-    public function setTablePrefix($prefix)
+    public function setTablePrefix(string $prefix): static
     {
         $this->tablePrefix = $prefix;
 
@@ -199,9 +186,8 @@ abstract class Grammar
      * Wrap the given value segments.
      *
      * @param array $segments
-     * @return string
      */
-    protected function wrapSegments($segments)
+    protected function wrapSegments($segments): string
     {
         return collect($segments)->map(function ($segment, $key) use ($segments) {
             return $key == 0 && count($segments) > 1

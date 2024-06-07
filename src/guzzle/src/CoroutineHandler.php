@@ -9,12 +9,15 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Guzzle;
 
+use Exception;
 use GuzzleHttp;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Promise\FulfilledPromise;
+use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Psr7;
 use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\Psr7\Utils;
@@ -41,7 +44,7 @@ class CoroutineHandler
     ];
 
     /**
-     * @return \GuzzleHttp\Promise\PromiseInterface
+     * @return PromiseInterface
      */
     public function __invoke(RequestInterface $request, array $options)
     {
@@ -73,7 +76,7 @@ class CoroutineHandler
 
         try {
             $raw = $client->request($request->getMethod(), $path, $headers, (string) $request->getBody());
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             $exception = new ConnectException($exception->getMessage(), $request, null, [
                 'errCode' => $exception->getCode(),
             ]);
@@ -126,7 +129,7 @@ class CoroutineHandler
                 if (is_string($options['verify'])) {
                     // Throw an error if the file/folder/link path is not valid or doesn't exist.
                     if (! file_exists($options['verify'])) {
-                        throw new \InvalidArgumentException("SSL CA bundle not found: {$options['verify']}");
+                        throw new InvalidArgumentException("SSL CA bundle not found: {$options['verify']}");
                     }
                     // If it's a directory or a link to a directory use CURLOPT_CAPATH.
                     // If not, it's probably a file, or a link to a file, so use CURLOPT_CAINFO.
@@ -235,7 +238,7 @@ class CoroutineHandler
     }
 
     /**
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     protected function getPort(UriInterface $uri): int
     {

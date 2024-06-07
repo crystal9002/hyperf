@@ -9,14 +9,16 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Paginator;
 
 use Countable;
+use Hyperf\Collection\Collection;
 use Hyperf\Contract\Arrayable;
-use Hyperf\Utils\Collection;
-use Hyperf\Utils\Contracts\Jsonable;
+use Hyperf\Contract\Jsonable;
 use IteratorAggregate;
 use JsonSerializable;
+use RuntimeException;
 
 class Paginator extends AbstractPaginator implements Arrayable, Countable, IteratorAggregate, JsonSerializable, Jsonable
 {
@@ -33,6 +35,8 @@ class Paginator extends AbstractPaginator implements Arrayable, Countable, Itera
      */
     public function __construct($items, int $perPage, ?int $currentPage = null, array $options = [])
     {
+        $this->options = $options;
+
         foreach ($options as $key => $value) {
             $this->{$key} = $value;
         }
@@ -66,7 +70,7 @@ class Paginator extends AbstractPaginator implements Arrayable, Countable, Itera
     public function render(?string $view = null, array $data = []): string
     {
         if ($view) {
-            throw new \RuntimeException('WIP.');
+            throw new RuntimeException('WIP.');
         }
         return json_encode($data, 0);
     }

@@ -9,16 +9,14 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\GraphQL;
 
 use Hyperf\Di\MetadataCollector;
 
 class ClassCollector extends MetadataCollector
 {
-    /**
-     * @var array
-     */
-    protected static $container = [];
+    protected static array $container = [];
 
     public static function collect(string $class)
     {

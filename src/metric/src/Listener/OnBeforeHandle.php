@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Metric\Listener;
 
 use Hyperf\Command\Event\AfterExecute;
@@ -17,15 +18,15 @@ use Hyperf\Contract\ConfigInterface;
 use Hyperf\Contract\StdoutLoggerInterface;
 use Hyperf\Coordinator\Constants;
 use Hyperf\Coordinator\CoordinatorManager;
+use Hyperf\Coordinator\Timer;
+use Hyperf\Coroutine\Coroutine;
 use Hyperf\Event\Contract\ListenerInterface;
 use Hyperf\Metric\Contract\MetricFactoryInterface;
 use Hyperf\Metric\Event\MetricFactoryReady;
 use Hyperf\Metric\MetricFactoryPicker;
 use Hyperf\Metric\MetricSetter;
-use Hyperf\Utils\Coroutine;
 use Psr\Container\ContainerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use Swoole\Timer;
 
 /**
  * Collect and handle metrics before command start.
@@ -40,9 +41,12 @@ class OnBeforeHandle implements ListenerInterface
 
     private ConfigInterface $config;
 
+    private Timer $timer;
+
     public function __construct(protected ContainerInterface $container)
     {
         $this->config = $container->get(ConfigInterface::class);
+        $this->timer = new Timer();
     }
 
     public function listen(): array
@@ -57,6 +61,10 @@ class OnBeforeHandle implements ListenerInterface
     {
         if ($event instanceof AfterExecute) {
             CoordinatorManager::until(Constants::WORKER_EXIT)->resume();
+            return;
+        }
+
+        if (! $this->config->get('metric.enable_command_metric', true)) {
             return;
         }
 
@@ -108,7 +116,7 @@ class OnBeforeHandle implements ListenerInterface
         );
 
         $timerInterval = $this->config->get('metric.default_metric_interval', 5);
-        $timerId = Timer::tick($timerInterval * 1000, function () use ($metrics) {
+        $timerId = $this->timer->tick($timerInterval, function () use ($metrics) {
             $this->trySet('gc_', $metrics, gc_status());
             $this->trySet('', $metrics, getrusage());
             $metrics['memory_usage']->set(memory_get_usage());
@@ -117,7 +125,7 @@ class OnBeforeHandle implements ListenerInterface
         // Clean up timer on worker exit;
         Coroutine::create(function () use ($timerId) {
             CoordinatorManager::until(Constants::WORKER_EXIT)->yield();
-            Timer::clear($timerId);
+            $this->timer->clear($timerId);
         });
     }
 }

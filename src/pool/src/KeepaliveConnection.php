@@ -9,23 +9,24 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Pool;
 
 use Closure;
 use Hyperf\Contract\ConnectionInterface;
 use Hyperf\Contract\StdoutLoggerInterface;
+use Hyperf\Coordinator\Timer;
 use Hyperf\Engine\Channel;
 use Hyperf\Pool\Exception\InvalidArgumentException;
 use Hyperf\Pool\Exception\SocketPopException;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
-use Swoole\Timer;
+use Throwable;
 
-/**
- * TODO: Support Swow, only for Swoole now.
- */
 abstract class KeepaliveConnection implements ConnectionInterface
 {
+    protected Timer $timer;
+
     protected Channel $channel;
 
     protected float $lastUseTime = 0.0;
@@ -38,6 +39,7 @@ abstract class KeepaliveConnection implements ConnectionInterface
 
     public function __construct(protected ContainerInterface $container, protected Pool $pool)
     {
+        $this->timer = new Timer();
     }
 
     public function __destruct()
@@ -133,13 +135,13 @@ abstract class KeepaliveConnection implements ConnectionInterface
     public function isTimeout(): bool
     {
         return $this->lastUseTime < microtime(true) - $this->pool->getOption()->getMaxIdleTime()
-            && $this->channel->length() > 0;
+            && $this->channel->getLength() > 0;
     }
 
     protected function addHeartbeat()
     {
         $this->connected = true;
-        $this->timerId = Timer::tick($this->getHeartbeat(), function () {
+        $this->timerId = $this->timer->tick($this->getHeartbeatSeconds(), function () {
             try {
                 if (! $this->isConnected()) {
                     return;
@@ -152,7 +154,7 @@ abstract class KeepaliveConnection implements ConnectionInterface
                 }
 
                 $this->heartbeat();
-            } catch (\Throwable $throwable) {
+            } catch (Throwable $throwable) {
                 $this->clear();
                 if ($logger = $this->getLogger()) {
                     $message = sprintf('Socket of %s heartbeat failed, %s', $this->name, $throwable);
@@ -163,24 +165,24 @@ abstract class KeepaliveConnection implements ConnectionInterface
     }
 
     /**
-     * @return int ms
+     * @return int seconds
      */
-    protected function getHeartbeat(): int
+    protected function getHeartbeatSeconds(): int
     {
         $heartbeat = $this->pool->getOption()->getHeartbeat();
 
         if ($heartbeat > 0) {
-            return intval($heartbeat * 1000);
+            return intval($heartbeat);
         }
 
-        return 10 * 1000;
+        return 10;
     }
 
     protected function clear()
     {
         $this->connected = false;
         if ($this->timerId) {
-            Timer::clear($this->timerId);
+            $this->timer->clear($this->timerId);
             $this->timerId = null;
         }
     }

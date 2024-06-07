@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Di\LazyLoader;
 
 use PhpParser\BuilderFactory;
@@ -16,6 +17,8 @@ use PhpParser\Node;
 use PhpParser\Node\Const_;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\ClassConst;
+
+use function Hyperf\Support\class_basename;
 
 abstract class AbstractLazyProxyBuilder
 {

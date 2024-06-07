@@ -9,16 +9,16 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Tracer\Aspect;
 
-use Hyperf\Di\Annotation\Aspect;
 use Hyperf\Di\Aop\AbstractAspect;
 use Hyperf\Di\Aop\ProceedingJoinPoint;
 use Hyperf\Tracer\Annotation\Trace;
 use Hyperf\Tracer\SpanStarter;
-use OpenTracing\Tracer;
+use Hyperf\Tracer\SwitchManager;
+use Throwable;
 
-#[Aspect]
 class TraceAnnotationAspect extends AbstractAspect
 {
     use SpanStarter;
@@ -27,7 +27,7 @@ class TraceAnnotationAspect extends AbstractAspect
         Trace::class,
     ];
 
-    public function __construct(private Tracer $tracer)
+    public function __construct(private SwitchManager $switchManager)
     {
     }
 
@@ -50,9 +50,11 @@ class TraceAnnotationAspect extends AbstractAspect
         $span->setTag($tag, $source);
         try {
             $result = $proceedingJoinPoint->process();
-        } catch (\Throwable $e) {
-            $span->setTag('error', true);
-            $span->log(['message', $e->getMessage(), 'code' => $e->getCode(), 'stacktrace' => $e->getTraceAsString()]);
+        } catch (Throwable $e) {
+            if ($this->switchManager->isEnable('exception') && ! $this->switchManager->isIgnoreException($e)) {
+                $span->setTag('error', true);
+                $span->log(['message', $e->getMessage(), 'code' => $e->getCode(), 'stacktrace' => $e->getTraceAsString()]);
+            }
             throw $e;
         } finally {
             $span->finish();

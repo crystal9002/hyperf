@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Database\Schema;
 
 use Hyperf\Database\Query\Processors\MySqlProcessor;
@@ -16,12 +17,31 @@ use Hyperf\Database\Query\Processors\MySqlProcessor;
 class MySqlBuilder extends Builder
 {
     /**
+     * Create a database in the schema.
+     */
+    public function createDatabase(string $name): bool
+    {
+        return $this->connection->statement(
+            $this->grammar->compileCreateDatabase($name, $this->connection)
+        );
+    }
+
+    /**
+     * Drop a database from the schema if the database exists.
+     */
+    public function dropDatabaseIfExists(string $name): bool
+    {
+        return $this->connection->statement(
+            $this->grammar->compileDropDatabaseIfExists($name)
+        );
+    }
+
+    /**
      * Determine if the given table exists.
      *
      * @param string $table
-     * @return bool
      */
-    public function hasTable($table)
+    public function hasTable($table): bool
     {
         $table = $this->connection->getTablePrefix() . $table;
 
@@ -35,9 +55,8 @@ class MySqlBuilder extends Builder
      * Get the column listing for a given table.
      *
      * @param string $table
-     * @return array
      */
-    public function getColumnListing($table)
+    public function getColumnListing($table): array
     {
         $table = $this->connection->getTablePrefix() . $table;
 

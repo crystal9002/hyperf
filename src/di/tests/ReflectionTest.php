@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\Di;
 
 use Hyperf\Di\ReflectionManager;
@@ -17,37 +18,41 @@ use HyperfTest\Di\Stub\Ast\FooTrait;
 use HyperfTest\Di\Stub\Foo;
 use HyperfTest\Di\Stub\FooInterface;
 use HyperfTest\Di\Stub\Inject\Foo3Trait;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use ReflectionFunction;
 use ReflectionMethod;
+use ReflectionNamedType;
 use ReflectionProperty;
 
 /**
  * @internal
  * @coversNothing
  */
+#[CoversNothing]
 class ReflectionTest extends TestCase
 {
     public function testReturnType()
     {
         $paramaters = ReflectionManager::reflectClass(Bar::class)->getMethod('__construct')->getParameters();
         foreach ($paramaters as $parameter) {
-            $this->assertTrue($parameter->getType() instanceof \ReflectionNamedType);
+            $this->assertTrue($parameter->getType() instanceof ReflectionNamedType);
         }
 
         $return = ReflectionManager::reflectClass(Bar::class)->getMethod('getId')->getReturnType();
-        $this->assertTrue($return instanceof \ReflectionNamedType);
+        $this->assertTrue($return instanceof ReflectionNamedType);
 
         $callback = function (int $id): int {
             return $id + 1;
         };
 
-        $func = new \ReflectionFunction($callback);
-        $this->assertTrue($func->getReturnType() instanceof \ReflectionNamedType);
+        $func = new ReflectionFunction($callback);
+        $this->assertTrue($func->getReturnType() instanceof ReflectionNamedType);
 
         $paramaters = $func->getParameters();
         foreach ($paramaters as $parameter) {
-            $this->assertTrue($parameter->getType() instanceof \ReflectionNamedType);
+            $this->assertTrue($parameter->getType() instanceof ReflectionNamedType);
         }
     }
 

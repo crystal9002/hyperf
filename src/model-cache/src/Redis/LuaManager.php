@@ -9,11 +9,14 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\ModelCache\Redis;
 
 use Hyperf\ModelCache\Config;
 use Hyperf\ModelCache\Exception\OperatorNotFoundException;
 use Hyperf\Redis\RedisProxy;
+
+use function Hyperf\Support\make;
 
 class LuaManager
 {

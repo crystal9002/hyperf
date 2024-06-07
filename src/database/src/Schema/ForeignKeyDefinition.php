@@ -9,9 +9,10 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Database\Schema;
 
-use Hyperf\Utils\Fluent;
+use Hyperf\Support\Fluent;
 
 /**
  * @method ForeignKeyDefinition references(array|string $columns) Specify the referenced column(s)

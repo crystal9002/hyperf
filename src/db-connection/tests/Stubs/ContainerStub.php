@@ -9,9 +9,11 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace HyperfTest\DbConnection\Stubs;
 
 use Hyperf\Config\Config;
+use Hyperf\Context\ApplicationContext;
 use Hyperf\Contract\ConfigInterface;
 use Hyperf\Contract\StdoutLoggerInterface;
 use Hyperf\Database\ConnectionResolverInterface;
@@ -23,7 +25,6 @@ use Hyperf\DbConnection\Pool\PoolFactory;
 use Hyperf\Event\EventDispatcher;
 use Hyperf\Event\ListenerProvider;
 use Hyperf\Framework\Logger\StdoutLogger;
-use Hyperf\Utils\ApplicationContext;
 use Mockery;
 use Psr\Container\ContainerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
@@ -89,6 +90,8 @@ class ContainerStub
 
         $container->shouldReceive('get')->with('db.connector.mysql')->andReturn(new MySqlConnector());
         $container->shouldReceive('has')->andReturn(true);
+        $container->shouldReceive('has')->with(StdoutLoggerInterface::class)->andReturnFalse();
+        $container->shouldReceive('has')->with(EventDispatcherInterface::class)->andReturnFalse();
         $container->shouldReceive('make')->with(Frequency::class)->andReturn(new Frequency());
 
         return $container;

@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Session;
 
 use Hyperf\Contract\SessionInterface;
@@ -24,13 +25,6 @@ class ConfigProvider
     public function __invoke(): array
     {
         return [
-            'annotations' => [
-                'scan' => [
-                    'paths' => [
-                        __DIR__,
-                    ],
-                ],
-            ],
             'dependencies' => [
                 FileHandler::class => FileHandlerFactory::class,
                 DatabaseHandler::class => DatabaseHandlerFactory::class,

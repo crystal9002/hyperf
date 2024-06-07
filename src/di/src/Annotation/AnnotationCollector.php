@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Di\Annotation;
 
 use Hyperf\Di\MetadataCollector;
@@ -82,6 +83,11 @@ class AnnotationCollector extends MetadataCollector
     public static function getClassAnnotation(string $class, string $annotation)
     {
         return static::get($class . '._c.' . $annotation);
+    }
+
+    public static function getClassAnnotations(string $class)
+    {
+        return static::get($class . '._c');
     }
 
     public static function getClassMethodAnnotation(string $class, string $method)

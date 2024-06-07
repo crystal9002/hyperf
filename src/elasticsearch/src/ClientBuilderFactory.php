@@ -9,11 +9,12 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Elasticsearch;
 
 use Elasticsearch\ClientBuilder;
+use Hyperf\Coroutine\Coroutine;
 use Hyperf\Guzzle\RingPHP\CoroutineHandler;
-use Hyperf\Utils\Coroutine;
 
 class ClientBuilderFactory
 {

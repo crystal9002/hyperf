@@ -9,17 +9,16 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Cache\Aspect;
 
 use Hyperf\Cache\Annotation\Cacheable;
 use Hyperf\Cache\AnnotationManager;
 use Hyperf\Cache\CacheManager;
 use Hyperf\Cache\Driver\KeyCollectorInterface;
-use Hyperf\Di\Annotation\Aspect;
 use Hyperf\Di\Aop\AbstractAspect;
 use Hyperf\Di\Aop\ProceedingJoinPoint;
 
-#[Aspect]
 class CacheableAspect extends AbstractAspect
 {
     public array $classes = [];
@@ -49,9 +48,12 @@ class CacheableAspect extends AbstractAspect
 
         $result = $proceedingJoinPoint->process();
 
-        $driver->set($key, $result, $ttl);
-        if ($driver instanceof KeyCollectorInterface && $annotation instanceof Cacheable && $annotation->collect) {
-            $driver->addKey($annotation->prefix . 'MEMBERS', $key);
+        if (! in_array($result, (array) $annotation->skipCacheResults, true)) {
+            $driver->set($key, $result, $ttl);
+
+            if ($driver instanceof KeyCollectorInterface && $annotation instanceof Cacheable && $annotation->collect) {
+                $driver->addKey($annotation->prefix . 'MEMBERS', $key);
+            }
         }
 
         return $result;

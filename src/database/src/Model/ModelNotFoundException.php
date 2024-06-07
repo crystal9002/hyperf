@@ -9,9 +9,10 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Database\Model;
 
-use Hyperf\Utils\Arr;
+use Hyperf\Collection\Arr;
 use RuntimeException;
 
 class ModelNotFoundException extends RuntimeException
@@ -50,8 +51,6 @@ class ModelNotFoundException extends RuntimeException
 
     /**
      * Get the affected Model model.
-     *
-     * @return string
      */
     public function getModel(): ?string
     {

@@ -9,18 +9,21 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Kafka;
 
 use Hyperf\Contract\ConfigInterface;
+use Hyperf\Coordinator\Constants;
+use Hyperf\Coordinator\CoordinatorManager;
+use Hyperf\Coroutine\Coroutine;
 use Hyperf\Engine\Channel;
 use Hyperf\Kafka\Exception\ConnectionClosedException;
-use Hyperf\Kafka\Exception\TimeoutException;
 use longlang\phpkafka\Broker;
 use longlang\phpkafka\Producer\ProduceMessage;
 use longlang\phpkafka\Producer\Producer as LongLangProducer;
 use longlang\phpkafka\Producer\ProducerConfig;
 use longlang\phpkafka\Socket\SwooleSocket;
-use Swoole\Coroutine;
+use Throwable;
 
 class Producer
 {
@@ -28,61 +31,63 @@ class Producer
 
     protected ?LongLangProducer $producer = null;
 
+    protected int $channelSize = 65535;
+
     public function __construct(protected ConfigInterface $config, protected string $name = 'default', protected int $timeout = 10)
     {
     }
 
     public function send(string $topic, ?string $value, ?string $key = null, array $headers = [], ?int $partitionIndex = null): void
     {
+        $this->sendAsync($topic, $value, $key, $headers, $partitionIndex)->wait();
+    }
+
+    public function sendAsync(string $topic, ?string $value, ?string $key = null, array $headers = [], ?int $partitionIndex = null): Promise
+    {
         $this->loop();
-        $ack = new Channel(1);
+        $promise = new Promise($this->timeout);
         $chan = $this->chan;
-        $chan->push(function () use ($topic, $key, $value, $headers, $partitionIndex, $ack) {
+        $chan->push(function () use ($topic, $key, $value, $headers, $partitionIndex, $promise) {
             try {
                 $this->producer->send($topic, $value, $key, $headers, $partitionIndex);
-                $ack->close();
-            } catch (\Throwable $e) {
-                $ack->push($e);
+                $promise->close();
+            } catch (Throwable $e) {
+                $promise->push($e);
                 throw $e;
             }
         });
         if ($chan->isClosing()) {
             throw new ConnectionClosedException('Connection closed.');
         }
-        if ($e = $ack->pop($this->timeout)) {
-            throw $e;
-        }
-        if ($ack->isTimeout()) {
-            throw new TimeoutException('Kafka send timeout.');
-        }
+        return $promise;
+    }
+
+    public function sendBatch(array $messages): void
+    {
+        $this->sendBatchAsync($messages)->wait();
     }
 
     /**
      * @param ProduceMessage[] $messages
      */
-    public function sendBatch(array $messages): void
+    public function sendBatchAsync(array $messages): Promise
     {
         $this->loop();
-        $ack = new Channel(1);
+        $promise = new Promise($this->timeout);
         $chan = $this->chan;
-        $chan->push(function () use ($messages, $ack) {
+        $chan->push(function () use ($messages, $promise) {
             try {
                 $this->producer->sendBatch($messages);
-                $ack->close();
-            } catch (\Throwable $e) {
-                $ack->push($e);
+                $promise->close();
+            } catch (Throwable $e) {
+                $promise->push($e);
                 throw $e;
             }
         });
         if ($chan->isClosing()) {
             throw new ConnectionClosedException('Connection closed.');
         }
-        if ($e = $ack->pop()) {
-            throw $e;
-        }
-        if ($ack->isTimeout()) {
-            throw new TimeoutException('Kafka send timeout.');
-        }
+        return $promise;
     }
 
     public function close(): void
@@ -106,26 +111,38 @@ class Producer
         if ($this->chan != null) {
             return;
         }
-        $this->chan = new Channel(1);
+        $this->chan = new Channel($this->channelSize);
         Coroutine::create(function () {
             while (true) {
                 $this->producer = $this->makeProducer();
                 while (true) {
-                    $closure = $this->chan->pop();
+                    $closure = $this->chan?->pop();
                     if (! $closure) {
                         break 2;
                     }
                     try {
                         $closure->call($this);
-                    } catch (\Throwable) {
+                    } catch (Throwable $e) {
                         $this->producer->close();
+
+                        $callback = $this->getConfig()->getExceptionCallback();
+                        if ($callback) {
+                            $callback($e);
+                        }
                         break;
                     }
                 }
             }
-            /* @phpstan-ignore-next-line */
-            $this->chan->close();
+
+            $this->chan?->close();
             $this->chan = null;
+            $this->producer->close();
+        });
+
+        Coroutine::create(function () {
+            if (CoordinatorManager::until(Constants::WORKER_EXIT)->yield()) {
+                $this->chan?->close();
+            }
         });
     }
 
@@ -138,7 +155,7 @@ class Producer
         $producerConfig->setRecvTimeout($config['recv_timeout']);
         $producerConfig->setClientId($config['client_id']);
         $producerConfig->setMaxWriteAttempts($config['max_write_attempts']);
-        $producerConfig->setSocket(SwooleSocket::class);
+        $producerConfig->setSocket($config['socket'] ?? SwooleSocket::class);
         $producerConfig->setBootstrapServers($config['bootstrap_servers']);
         $producerConfig->setAcks($config['acks']);
         $producerConfig->setProducerId($config['producer_id']);
@@ -147,6 +164,7 @@ class Producer
         $producerConfig->setAutoCreateTopic($config['auto_create_topic']);
         ! empty($config['sasl']) && $producerConfig->setSasl($config['sasl']);
         ! empty($config['ssl']) && $producerConfig->setSsl($config['ssl']);
+        is_callable($config['exception_callback'] ?? null) && $producerConfig->setExceptionCallback($config['exception_callback']);
         return new LongLangProducer($producerConfig);
     }
 }

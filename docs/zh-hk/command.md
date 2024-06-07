@@ -27,7 +27,7 @@ php bin/hyperf.php gen:command FooCommand
 
 ### 定義命令
 
-定義該命令類所對應的命令有兩種形式，一種是通過 `$name` 屬性定義，另一種是通過構造函數傳參來定義，我們通過代碼示例來演示一下，假設我們希望定義該命令類的命令為 `foo:hello`：
+定義該命令類所對應的命令有三種形式，第一種是通過 `$name` 屬性定義，第二種是通過構造函數傳參來定義，最後一種是通過註解來定義，我們通過代碼示例來演示一下，假設我們希望定義該命令類的命令為 `foo:hello`：
 
 #### `$name` 屬性定義：
 
@@ -47,7 +47,7 @@ class FooCommand extends HyperfCommand
     /**
      * 執行的命令行
      */
-    protected string $name = 'foo:hello';
+    protected ?string $name = 'foo:hello';
 }
 ```
 
@@ -73,6 +73,25 @@ class FooCommand extends HyperfCommand
 }
 ```
 
+#### 註解定義：
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Command;
+
+use Hyperf\Command\Command as HyperfCommand;
+use Hyperf\Command\Annotation\Command;
+
+#[Command(name: "foo:hello")]
+class FooCommand extends HyperfCommand
+{
+
+}
+```
+
 ### 定義命令類邏輯
 
 命令類實際運行的邏輯是取決於 `handle` 方法內的代碼，也就意味着 `handle` 方法就是命令的入口。
@@ -93,7 +112,7 @@ class FooCommand extends HyperfCommand
     /**
      * 執行的命令行
      */
-    protected string $name = 'foo:hello';
+    protected ?string $name = 'foo:hello';
 
     public function handle()
     {
@@ -128,7 +147,7 @@ class FooCommand extends HyperfCommand
     /**
      * 執行的命令行
      */
-    protected string $name = 'foo:hello';
+    protected ?string $name = 'foo:hello';
 
     public function handle()
     {
@@ -378,7 +397,7 @@ class DebugCommand extends HyperfCommand
 {
     protected ContainerInterface $container;
 
-    protected $signature = 'test:test {id : user_id} {--name= : user_name}';
+    protected ?string $signature = 'test:test {id : user_id} {--name= : user_name}';
 
     public function __construct(ContainerInterface $container)
     {
@@ -403,7 +422,7 @@ class DebugCommand extends HyperfCommand
 
 # 運行命令
 
-!> 注意：在運行命令時，默認不會觸發事件分發，可通過添加 `--enable-event-dispatcher` 參數來開啟。
+!> 注意：在運行命令時，默認會觸發事件分發，可通過添加 `--disable-event-dispatcher` 參數來關閉。
 
 ## 命令行中運行
 
@@ -463,7 +482,7 @@ $input = new ArrayInput($params);
 $output = new NullOutput();
 
 /** @var \Psr\Container\ContainerInterface $container */
-$container = \Hyperf\Utils\ApplicationContext::getContainer();
+$container = \Hyperf\Context\ApplicationContext::getContainer();
 
 /** @var \Symfony\Component\Console\Application $application */
 $application = $container->get(\Hyperf\Contract\ApplicationInterface::class);
@@ -474,4 +493,77 @@ $exitCode = $application->run($input, $output);
 
 // 第二種方式: 會暴露異常, 需要自己捕捉和處理運行中的異常, 否則會阻止程序的返回
 $exitCode = $application->find($command)->run($input, $output);
+```
+
+## 閉包命令
+
+您可以在 `config\console.php` 中快速定義命令。
+
+```php
+use Hyperf\Command\Console;
+
+Console::command('hello', function () {
+    $this->comment('Hello, Hyperf!');
+})->describe('This is a demo closure command.');
+```
+
+為閉包命令定義計劃任務。
+
+```php
+use Hyperf\Command\Console;
+
+Console::command('foo', function () {
+    $this->comment('Hello, Foo!');
+})->describe('This is a demo closure command.')->cron('* * * * *');
+
+Console::command('bar', function () {
+    $this->comment('Hello, Bar!');
+})->describe('This is another demo closure command.')->cron('* * * * *', callback: fn($cron) => $cron->setSingleton(true));
+```
+
+## AsCommand
+
+您可以通過 `AsCommand` 註解來將一個類轉換為命令。
+
+```php
+<?php
+
+namespace App\Service;
+
+use Hyperf\Command\Annotation\AsCommand;
+use Hyperf\Command\Concerns\InteractsWithIO;
+
+#[AsCommand(signature: 'foo:bar1', handle: 'bar1', description: 'The description of foo:bar1 command.')]
+#[AsCommand(signature: 'foo', description: 'The description of foo command.')]
+class FooService
+{
+    use InteractsWithIO;
+
+    #[AsCommand(signature: 'foo:bar {--bar=1 : Bar Value}', description: 'The description of foo:bar command.')]
+    public function bar($bar)
+    {
+        $this->output?->info('Bar Value: ' . $bar);
+
+        return $bar;
+    }
+
+    public function bar1()
+    {
+        $this->output?->info(__METHOD__);
+    }
+
+    public function handle()
+    {
+        $this->output?->info(__METHOD__);
+    }
+}
+```
+
+```shell
+$ php bin/hyperf.php
+
+...
+foo
+  foo:bar                   The description of foo:bar command.
+  foo:bar1                  The description of foo:bar1 command.
 ```

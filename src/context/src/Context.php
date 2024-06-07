@@ -9,10 +9,13 @@ declare(strict_types=1);
  * @contact  group@hyperf.io
  * @license  https://github.com/hyperf/hyperf/blob/master/LICENSE
  */
+
 namespace Hyperf\Context;
 
 use Closure;
 use Hyperf\Engine\Coroutine;
+
+use function Hyperf\Support\value;
 
 class Context
 {
@@ -50,8 +53,12 @@ class Context
     /**
      * Release the context when you are not in coroutine environment.
      */
-    public static function destroy(string $id): void
+    public static function destroy(string $id, ?int $coroutineId = null): void
     {
+        if (Coroutine::id() > 0) {
+            unset(Coroutine::getContextFor($coroutineId)[$id]);
+        }
+
         unset(static::$nonCoContext[$id]);
     }
 
@@ -86,7 +93,7 @@ class Context
         $value = null;
 
         if (self::has($id, $coroutineId)) {
-            $value = self::get($id, $coroutineId);
+            $value = self::get($id, null, $coroutineId);
         }
 
         $value = $closure($value);
@@ -105,7 +112,7 @@ class Context
             return self::set($id, value($value), $coroutineId);
         }
 
-        return self::get($id, $coroutineId);
+        return self::get($id, null, $coroutineId);
     }
 
     public static function getContainer(?int $coroutineId = null)
